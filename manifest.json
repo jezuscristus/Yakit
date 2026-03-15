@@ -3,7 +3,7 @@
   "short_name": "Yakıt Takip",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#002c5f",
+  "background_color": "#000000",
   "theme_color": "#002c5f",
   "icons": [
     {
