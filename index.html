@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>VIP Yakıt Asistanı Pro</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.8); --glass-border: rgba(255, 255, 255, 0.4);
+            --text-main: #222222; --text-muted: #555555;
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.8); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc;
+        }
+        body.theme-nline {
+            --primary: #e63946; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%);
+            --glass-bg: rgba(30, 30, 30, 0.85); --glass-border: rgba(230, 57, 70, 0.3);
+            --text-main: #f1f1f1; --text-muted: #aaaaaa;
+        }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        body.privacy-mode .money-blur { filter: blur(8px) grayscale(1); opacity: 0.5; pointer-events: none; }
+
+        /* AÇILIŞ EKRANI */
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 1s ease-in-out; }
+        .rpm-box { position: relative; width: 280px; height: 280px; }
+        #needle { transform-origin: 140px 140px; transform: rotate(-120deg); transition: 0.05s; }
+
+        /* ANA İÇERİK */
+        .main-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(110px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+        .tab-content { display: none; animation: fadeIn 0.5s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+        /* ÜST BAR */
+        .top-bar { display: flex; align-items: center; justify-content: center; width: 100%; height: 60px; padding-top: env(safe-area-inset-top); position: relative; }
+        .app-brand { font-size: 14px; font-weight: 800; letter-spacing: 2px; color: var(--primary); text-transform: uppercase; }
+        .privacy-btn { position: absolute; right: 15px; background: var(--glass-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--glass-border); font-size: 14px; }
+
+        /* PROFİL */
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; }
+        .profile-pic-container { position: relative; cursor: pointer; }
+        .profile-pic-large { width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; box-shadow: 0 5px 15px rgba(0,0,0,0.2); background: #eee; }
+        .vehicle-badge { position: absolute; bottom: -2px; right: -2px; background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid white; }
+
+        /* KARTLAR */
+        .card { background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 24px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .card-title { font-size: 15px; font-weight: 800; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: var(--primary); }
+
+        /* BUTONLAR */
+        .btn { width: 100%; padding: 16px; background: var(--primary); color: white; border: none; border-radius: 18px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .btn:active { transform: scale(0.96); opacity: 0.9; }
+        .btn-story { background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); }
+        .btn-outline { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); }
+
+        /* GÖRSEL GARAJ */
+        .visual-garage { width: 100%; height: 260px; background: rgba(0,0,0,0.04); border-radius: 24px; display: flex; justify-content: center; align-items: center; margin-bottom: 20px; position: relative; border: 1px solid var(--glass-border); }
+        .car-view { width: 90px; height: 180px; background: #1a1a1a; border-radius: 25px; position: relative; border: 2px solid #333; }
+        .moto-view { width: 45px; height: 160px; background: #1a1a1a; border-radius: 12px; position: relative; border: 2px solid #333; display: flex; flex-direction: column; justify-content: space-between; align-items: center;}
+        .tire { position: absolute; width: 18px; height: 40px; background: #111; border-radius: 6px; }
+        .tire-fl { top: 25px; left: -10px; } .tire-fr { top: 25px; right: -10px; }
+        .tire-rl { bottom: 25px; left: -10px; } .tire-rr { bottom: 25px; right: -10px; }
+        .tire-mf { top: -10px; width: 16px; height: 35px; } .tire-mr { bottom: -10px; width: 22px; height: 45px; }
+        .psi-label { position: absolute; font-size: 11px; font-weight: 800; background: white; padding: 4px 8px; border-radius: 8px; color: black; border: 1px solid #ddd; z-index: 5; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+
+        /* ALT MENÜ (FIXED) */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(80px + env(safe-area-inset-bottom)); background: var(--glass-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); z-index: 9999; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); font-size: 10px; font-weight: 600; width: 25%; transition: 0.2s; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 24px; margin-bottom: 4px; }
+
+        /* HATA ÇÖZÜMÜ: ŞABLONLAR ARTIK EKRANIN %1'İNDE AMA GÖRÜNÜR */
+        .render-area { position: fixed; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; opacity: 1; z-index: -100; pointer-events: none; }
+        #storyTemplate { width: 400px; height: 711px; background: #050505; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+        
+        /* OVERLAY MODALLAR */
+        .full-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 100000; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .result-box { background: white; padding: 30px; border-radius: 28px; text-align: center; width: 100%; max-width: 320px; color: black; }
+    </style>
+</head>
+<body class="theme-nline">
+
+    <div id="splashScreen">
+        <div class="rpm-box">
+            <svg viewBox="0 0 280 280" style="width:100%; height:100%;">
+                <path d="M 50 220 A 100 100 0 1 1 230 220" fill="none" stroke="#222" stroke-width="10" stroke-linecap="round"/>
+                <path id="rpmCircle" d="M 50 220 A 100 100 0 1 1 230 220" fill="none" stroke="red" stroke-width="10" stroke-linecap="round" stroke-dasharray="480" stroke-dashoffset="480"/>
+                <line id="needle" x1="140" y1="140" x2="140" y2="50" stroke="white" stroke-width="5" stroke-linecap="round" />
+            </svg>
+            <div style="position:absolute; top:170px; width:100%; text-align:center;">
+                <span id="rpmValue" style="font-size:50px; font-weight:800; color:white;">0</span>
+                <p style="color:red; font-size:14px; font-weight:800; letter-spacing:3px;">RPM</p>
+            </div>
+        </div>
+        <h1 class="splash-title-liquid-neon">VIP YAKIT ASİSTANI</h1>
+    </div>
+
+    <div id="resultModal" class="full-overlay">
+        <div class="result-box">
+            <h3 id="resultTitle" style="font-weight: 800; font-size: 20px;">İşlem Tamam!</h3>
+            <p id="resultDesc" style="font-size:13px; margin: 15px 0; color: #555;">Görsel hazırlanıyor...</p>
+            <img id="resultImg" style="width:100%; border-radius:18px; display:none; margin-bottom:20px; border:1px solid #eee;">
+            <a id="resultLink" href="#" target="_blank" class="btn" style="text-decoration:none; display:none;">Aç / İndir</a>
+            <button class="btn btn-outline" onclick="closeModal()">Kapat</button>
+        </div>
+    </div>
+
+    <div class="render-area">
+        <div id="storyTemplate">
+            <img id="stPic" src="" crossorigin="anonymous" style="width:140px; height:140px; border-radius:50%; border:5px solid white; margin-bottom:25px; background: #333;">
+            <h2 id="stName" style="font-size:30px; font-weight:800;">Sürücü</h2>
+            <div id="stPlate" style="background:#e63946; padding:8px 25px; border-radius:12px; margin:15px 0; font-weight: 800; letter-spacing: 2px;">PLAKA</div>
+            <div style="background:#1a1c23; padding:35px; border-radius:28px; width:100%; margin-top:40px; border:1px solid #333; text-align: center;">
+                <p style="color:#888; font-size:14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Yakıt Ortalaması</p>
+                <h3 id="stAvg" style="font-size:50px; color:#2ecc71; font-weight: 800;">0.0 L</h3>
+            </div>
+            <p style="margin-top:auto; font-size:12px; color:#555; letter-spacing: 1px;">VIP Yakıt Takip Asistanı Pro v21</p>
+        </div>
+        <div id="pdfTemplate">
+            </div>
+    </div>
+
+    <div class="top-bar">
+        <div class="app-brand">Yakıt Takip Asistanı</div>
+        <div class="privacy-btn" onclick="togglePrivacy()"><i class="fas fa-eye-slash" id="pIcon"></i></div>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none;">
+        <div class="header-top">
+            <div class="greeting-box">
+                <p id="timeMsg" style="font-weight: 600; color: var(--text-muted);">İyi sürüşler,</p>
+                <h1 id="userName" style="font-weight: 800;">Sürücü</h1>
+            </div>
+            <div class="profile-pic-container" onclick="switchProfile()">
+                <img id="headerPic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJhNSA1IDAgMSAwIDAgMTAgNSA1IDAgMCAwIDAtMTB6bTAgMTJjLTMuMyAwLTkuOSAxLjctOS45IDVWMThoMTkuOFYxOWMwLTMuMy02LjYtNS05LjktNXoiLz48L3N2Zz4=" class="profile-pic-large">
+                <div class="vehicle-badge" id="vBadge"><i class="fas fa-car"></i></div>
+            </div>
+        </div>
+
+        <div id="tab-home" class="tab-content active">
+            <div class="top-action-row" style="display:flex; gap:10px; margin-bottom:20px;">
+                <button class="btn btn-story" style="margin-top:0;" onclick="genStory()"><i class="fab fa-instagram"></i> Story</button>
+                <button class="btn" style="margin-top:0; background:#3498db;" onclick="acTripModal()"><i class="fas fa-map-marked-alt"></i> Yolculuk</button>
+            </div>
+            
+            <div class="dashboard" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
+                <div class="stat-card card" style="margin-bottom:0;"><i class="fas fa-leaf" style="color:#2ecc71;"></i><p style="font-size:10px; color:var(--text-muted);">ORTALAMA</p><h3 id="dAvg">- L</h3></div>
+                <div class="stat-card card" style="margin-bottom:0;"><i class="fas fa-wallet" style="color:var(--accent);"></i><p style="font-size:10px; color:var(--text-muted);">TOPLAM</p><h3 id="dTotal" class="money-blur">0 ₺</h3></div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-line"></i> Harcama Trendi</h2>
+                <canvas id="mainChart" style="width:100%; height:180px;"></canvas>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <button class="btn" style="background:#3498db; margin-bottom:15px;" onclick="document.getElementById('ocrIn').click()"><i class="fas fa-camera"></i> Yapay Zeka ile Tara</button>
+            <input type="file" id="ocrIn" style="display:none;" accept="image/*" capture="environment" onchange="ocrProcess(event)">
+            
+            <div class="card">
+                <div class="input-group"><label>Tarih</label><input type="date" id="fDate"></div>
+                <div class="input-group"><label>Güncel KM</label><input type="number" id="fKm" placeholder="Örn: 15400"></div>
+                <div class="input-group"><label>Alınan Litre</label><input type="number" step="0.01" id="fLtr" placeholder="35.5"></div>
+                <div class="input-group"><label>Litre Fiyatı (₺)</label><input type="number" step="0.01" id="fPrc" placeholder="43.50"></div>
+                <button class="btn" onclick="addEntry()"><i class="fas fa-save"></i> Kaydet ve Analiz Et</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <button class="btn btn-outline" style="margin-bottom:15px;" onclick="genPDF()"><i class="fas fa-file-pdf"></i> Aylık PDF Rapor Al</button>
+            <div class="card" style="padding: 10px;">
+                <table style="width:100%; font-size:12px; border-collapse:collapse;" id="hTable">
+                    <thead><tr style="text-align:left; border-bottom:1px solid #ddd;"><th style="padding:10px 5px;">Tarih</th><th style="padding:10px 5px;">KM</th><th style="padding:10px 5px;">Tutar</th><th style="padding:10px 5px;">Sil</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-settings" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Görsel Garaj</h2>
+                <div class="visual-garage">
+                    <div id="vg-car" class="car-view">
+                        <div class="tire tire-fl"></div><div class="psi-label" style="top:15px; left:-55px;" id="p-fl">--</div>
+                        <div class="tire tire-fr"></div><div class="psi-label" style="top:15px; right:-55px;" id="p-fr">--</div>
+                        <div class="tire tire-rl"></div><div class="psi-label" style="bottom:15px; left:-55px;" id="p-rl">--</div>
+                        <div class="tire tire-rr"></div><div class="psi-label" style="bottom:15px; right:-55px;" id="p-rr">--</div>
+                    </div>
+                    <div id="vg-moto" class="moto-view" style="display:none;">
+                        <div class="tire tire-mf"></div><div class="psi-label" style="top:10px; left:-55px;" id="p-mf">--</div>
+                        <div class="tire tire-mr"></div><div class="psi-badge psi-label" style="bottom:10px; left:-55px;" id="p-mr">--</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <div class="input-group"><label>Ön PSI</label><input type="number" id="psiF"></div>
+                    <div class="input-group"><label>Arka PSI</label><input type="number" id="psiR"></div>
+                </div>
+                <div class="input-group"><label>Ad Soyad</label><input type="text" id="pName"></div>
+                <div class="input-group"><label>Plaka</label><input type="text" id="pPlate" style="text-transform: uppercase;"></div>
+                <button class="btn" onclick="saveSettings()">Ayarları Kaydet</button>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title">Temalar</h2>
+                <button class="auto-theme-btn" id="autoBtn" onclick="toggleAutoTheme()"><i class="fas fa-magic"></i> Otomatik</button>
+                <div class="theme-selector">
+                    <button class="theme-btn" onclick="temaSec('standart')">Gündüz</button>
+                    <button class="theme-btn" onclick="temaSec('gece')">Gece</button>
+                    <button class="theme-btn" onclick="temaSec('nline')">N-Line</button>
+                </div>
+            </div>
+
+            <button class="btn btn-black" style="background:#111; margin-top: 30px;" onclick="modalAc()"><i class="fas fa-trash-alt"></i> Verileri Sıfırla</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="nav('home', this)"><i class="fas fa-home"></i><span>Panel</span></div>
+        <div class="nav-item" onclick="nav('add', this)"><i class="fas fa-plus-circle"></i><span>Ekle</span></div>
+        <div class="nav-item" onclick="nav('history', this)"><i class="fas fa-history"></i><span>Geçmiş</span></div>
+        <div class="nav-item" onclick="nav('settings', this)"><i class="fas fa-cog"></i><span>Garaj</span></div>
+    </div>
+
+<script>
+    // --- VERİ MİMARİSİ ---
+    let profile = localStorage.getItem('vP') || 'car';
+    let data = JSON.parse(localStorage.getItem('vD_' + profile)) || [];
+    let settings = JSON.parse(localStorage.getItem('vS_' + profile)) || { name: 'Sürücü', plate: '', psiF: '', psiR: '', img: '' };
+    let isAutoTheme = localStorage.getItem('i20_auto_theme') !== 'false';
+    let chart;
+
+    function nav(id, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+        if(id === 'home') updateUI();
+    }
+
+    function switchProfile() {
+        if ("vibrate" in navigator) navigator.vibrate(50);
+        profile = profile === 'car' ? 'moto' : 'car';
+        localStorage.setItem('vP', profile);
+        location.reload(); // En güvenli veri ayrıştırma
+    }
+
+    function updateUI() {
+        document.getElementById('userName').innerText = settings.name;
+        document.getElementById('vBadge').innerHTML = profile === 'car' ? '<i class="fas fa-car"></i>' : '<i class="fas fa-motorcycle"></i>';
+        
+        if(profile === 'car') {
+            document.getElementById('vg-car').style.display = 'block';
+            document.getElementById('vg-moto').style.display = 'none';
+            document.getElementById('p-fl').innerText = settings.psiF || '--';
+            document.getElementById('p-fr').innerText = settings.psiF || '--';
+            document.getElementById('p-rl').innerText = settings.psiR || '--';
+            document.getElementById('p-rr').innerText = settings.psiR || '--';
+        } else {
+            document.getElementById('vg-car').style.display = 'none';
+            document.getElementById('vg-moto').style.display = 'flex';
+            document.getElementById('p-mf').innerText = settings.psiF || '--';
+            document.getElementById('p-mr').innerText = settings.psiR || '--';
+        }
+
+        let total = data.reduce((sum, e) => sum + (parseFloat(e.ltr) * parseFloat(e.prc)), 0);
+        document.getElementById('dTotal').innerText = total.toFixed(0) + " ₺";
+        
+        let avg = 0;
+        if(data.length > 1) {
+            let sorted = [...data].sort((a,b) => new Date(a.date) - new Date(b.date));
+            let totalLtr = sorted.slice(1).reduce((sum, e) => sum + parseFloat(e.ltr), 0);
+            let totalKm = sorted[sorted.length-1].km - sorted[0].km;
+            avg = totalKm > 0 ? (totalLtr / totalKm) * 100 : 0;
+        }
+        document.getElementById('dAvg').innerText = avg > 0 ? avg.toFixed(1) + " L" : "- L";
+
+        let tbody = document.querySelector('#hTable tbody');
+        tbody.innerHTML = '';
+        data.slice().reverse().forEach((e, i) => {
+            tbody.innerHTML += `<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);"><td style="padding:12px 5px;">${e.date.split('-').reverse().join('.')}</td><td style="padding:12px 5px;">${e.km}</td><td style="padding:12px 5px; font-weight:800;">${(e.ltr*e.prc).toFixed(0)}₺</td><td style="padding:12px 5px;"><i class="fas fa-trash" style="color:red;" onclick="delEntry(${data.length-1-i})"></i></td></tr>`;
+        });
+        drawChart();
+    }
+
+    function addEntry() {
+        let entry = {
+            date: document.getElementById('fDate').value,
+            km: parseInt(document.getElementById('fKm').value),
+            ltr: parseFloat(document.getElementById('fLtr').value),
+            prc: parseFloat(document.getElementById('fPrc').value)
+        };
+        if(!entry.date || isNaN(entry.km)) return alert("Eksik bilgi!");
+        data.push(entry);
+        localStorage.setItem('vD_' + profile, JSON.stringify(data));
+        nav('home', document.querySelectorAll('.nav-item')[0]);
+    }
+
+    function delEntry(idx) {
+        if(confirm("Silmek istediğinize emin misiniz?")) {
+            data.splice(idx, 1);
+            localStorage.setItem('vD_' + profile, JSON.stringify(data));
+            updateUI();
+        }
+    }
+
+    function saveSettings() {
+        settings.name = document.getElementById('pName').value || 'Sürücü';
+        settings.plate = document.getElementById('pPlate').value.toUpperCase();
+        settings.psiF = document.getElementById('psiF').value;
+        settings.psiR = document.getElementById('psiR').value;
+        localStorage.setItem('vS_' + profile, JSON.stringify(settings));
+        alert("Garaj Kaydedildi!");
+        updateUI();
+    }
+
+    function togglePrivacy() {
+        document.body.classList.toggle('privacy-mode');
+        localStorage.setItem('privacy_mode', document.body.classList.contains('privacy-mode'));
+        document.getElementById('pIcon').className = document.body.classList.contains('privacy-mode') ? "fas fa-eye" : "fas fa-eye-slash";
+    }
+
+    // --- TEMA MOTORU ---
+    function applyTheme(t) {
+        document.body.classList.remove('theme-gece', 'theme-nline');
+        if(t !== 'standart') document.body.classList.add('theme-' + t);
+        localStorage.setItem('i20_tema', t);
+    }
+    function temaSec(t) { isAutoTheme = false; localStorage.setItem('i20_auto_theme', 'false'); document.getElementById('autoBtn').classList.remove('active'); applyTheme(t); }
+    function toggleAutoTheme() { isAutoTheme = true; localStorage.setItem('i20_auto_theme', 'true'); checkAutoTheme(); }
+    function checkAutoTheme() {
+        if(!isAutoTheme) return;
+        document.getElementById('autoBtn').classList.add('active');
+        let h = new Date().getHours();
+        applyTheme((h >= 19 || h < 7) ? 'gece' : 'standart');
+    }
+
+    // --- RPM MOTORU (FINAL FIX) ---
+    function uygulamayiBaslat() {
+        let rpmVal = document.getElementById('rpmValue');
+        let needle = document.getElementById('needle');
+        let circle = document.getElementById('rpmCircle');
+        let currentRpm = 0;
+        let start = null;
+
+        function step(timestamp) {
+            if (!start) start = timestamp;
+            let progress = timestamp - start;
+            currentRpm = Math.min((progress / 2000) * 8000, 8000);
+            
+            rpmVal.innerText = Math.floor(currentRpm);
+            needle.style.transform = `rotate(${-120 + (currentRpm/8000)*240}deg)`;
+            circle.style.strokeDashoffset = 480 - (currentRpm/8000)*480;
+
+            if (progress < 2000) {
+                window.requestAnimationFrame(step);
+            } else {
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splashScreen').style.display = 'none';
+                        document.getElementById('mainApp').style.display = 'block';
+                        updateUI();
+                        checkAutoTheme();
+                    }, 800);
+                }, 1000);
+            }
+        }
+        window.requestAnimationFrame(step);
+        document.getElementById('fDate').valueAsDate = new Date();
+    }
+
+    // --- STORY & PDF (IOS COMPATIBLE) ---
+    async function genStory() {
+        const modal = document.getElementById('resultModal');
+        const resImg = document.getElementById('resultImg');
+        const template = document.getElementById('storyTemplate');
+        
+        document.getElementById('stName').innerText = settings.name;
+        document.getElementById('stPlate').innerText = settings.plate || "PREMIUM";
+        document.getElementById('stAvg').innerText = document.getElementById('dAvg').innerText;
+        document.getElementById('stPic').src = settings.img || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJhNSA1IDAgMSAwIDAgMTAgNSA1IDAgMCAwIDAtMTB6bTAgMTJjLTMuMyAwLTkuOSAxLjctOS45IDVWMThoMTkuOFYxOWMwLTMuMy02LjYtNS05LjktNXoiLz48L3N2Zz4=";
+
+        modal.style.display = 'flex';
+        document.getElementById('resultTitle').innerText = "Hazırlanıyor...";
+        
+        setTimeout(() => {
+            html2canvas(template, { scale: 2, backgroundColor: '#050505', useCORS: true }).then(canvas => {
+                resImg.src = canvas.toDataURL("image/png");
+                resImg.style.display = 'block';
+                document.getElementById('resultTitle').innerText = "Story Hazır!";
+                document.getElementById('resultDesc').innerText = "Fotoğrafı basılı tutup kaydedin.";
+            });
+        }, 800);
+    }
+
+    async function genPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFontSize(22); doc.text("Yakit Takip Raporu", 20, 20);
+        doc.setFontSize(12); doc.text(`Surucu: ${settings.name} | Arac: ${profile.toUpperCase()}`, 20, 30);
+        let y = 50;
+        data.forEach(e => {
+            doc.text(`${e.date} | ${e.km} KM | ${e.ltr}L | ${(e.ltr*e.prc).toFixed(1)} TL`, 20, y);
+            y += 10;
+        });
+        const modal = document.getElementById('resultModal');
+        modal.style.display = 'flex';
+        const link = document.getElementById('resultLink');
+        link.href = doc.output('bloburl');
+        link.style.display = 'flex';
+        link.innerText = "PDF Raporu Aç";
+    }
+
+    function closeModal() {
+        document.getElementById('resultModal').style.display = 'none';
+        document.getElementById('resultImg').style.display = 'none';
+        document.getElementById('resultLink').style.display = 'none';
+    }
+
+    function drawChart() {
+        let ctx = document.getElementById('mainChart').getContext('2d');
+        if(chart) chart.destroy();
+        let labels = data.map(e => e.date.split('-')[2]);
+        let vals = data.map(e => (parseFloat(e.ltr) * parseFloat(e.prc)));
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: [{ data: vals, borderColor: '#e63946', tension: 0.4, fill: true, backgroundColor: 'rgba(230, 57, 70, 0.1)' }] },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+        });
+    }
+
+    function modalAc() { document.getElementById('customConfirmModal').style.display = 'flex'; }
+    function modalKapat() { document.getElementById('customConfirmModal').style.display = 'none'; }
+    function verileriOnaylaSil() { localStorage.clear(); location.reload(); }
+</script>
+
+</body>
+</html>
