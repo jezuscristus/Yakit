@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>VIP Yakıt Asistanı</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+        body.theme-nline {
+            --primary: #e63946; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%);
+            --glass-bg: rgba(30, 30, 30, 0.8); --glass-border: rgba(230, 57, 70, 0.3);
+            --text-main: #f1f1f1; --text-muted: #aaaaaa; --input-bg: rgba(15, 15, 15, 0.9);
+        }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        body.privacy-mode .money-blur { filter: blur(8px); opacity: 0.5; pointer-events: none; }
+
+        /* AÇILIŞ EKRANI */
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.8s ease-in-out; }
+        .rpm-container { position: relative; width: 300px; height: 300px; margin-top: -50px; }
+        .gauge-bar { stroke-width: 10; stroke-dasharray: 520; stroke-dashoffset: 520; animation: revUp 2s forwards; }
+        @keyframes revUp { from { stroke-dashoffset: 520; } to { stroke-dashoffset: 0; } }
+        #needle { transform-origin: 150px 150px; transition: transform 0.05s linear; }
+
+        /* ANA İÇERİK */
+        .main-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(100px + env(safe-area-inset-bottom)); width: 100%; }
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+        /* MERKEZLENMİŞ BAŞLIK */
+        .top-bar { display: flex; align-items: center; justify-content: center; padding: 10px 15px; position: relative; width: 100%; height: 50px; }
+        .app-brand { font-size: 16px; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
+        .privacy-btn { position: absolute; right: 15px; background: var(--glass-bg); padding: 8px; border-radius: 12px; border: 1px solid var(--glass-border); }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
+        .profile-pic-container { position: relative; cursor: pointer; }
+        .profile-pic-large { width: 70px; height: 70px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; background: #eee; }
+        .vehicle-badge { position: absolute; bottom: -2px; right: -2px; background: var(--primary); color: white; width: 25px; height: 25px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid white; }
+
+        /* KARTLAR */
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; margin-bottom: 20px; width: 100%; }
+        .card-title { font-size: 15px; font-weight: 800; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; color: var(--primary); }
+
+        /* BUTONLAR */
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 15px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px; }
+        .btn:active { transform: scale(0.98); }
+        .btn-story { background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); }
+        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+
+        /* GÖRSEL GARAJ */
+        .visual-garage { width: 100%; height: 250px; background: rgba(0,0,0,0.03); border-radius: 20px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; position: relative; border: 1px solid var(--glass-border); }
+        .car-view { width: 80px; height: 180px; background: #222; border-radius: 20px; position: relative; border: 2px solid #444; }
+        .tire { position: absolute; width: 15px; height: 35px; background: #111; border-radius: 4px; }
+        .tire-fl { top: 20px; left: -10px; } .tire-fr { top: 20px; right: -10px; }
+        .tire-rl { bottom: 20px; left: -10px; } .tire-rr { bottom: 20px; right: -10px; }
+        .psi-label { position: absolute; font-size: 10px; font-weight: 800; background: white; padding: 2px 5px; border-radius: 5px; color: black; border: 1px solid #ddd; }
+
+        /* ALT MENÜ */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(75px + env(safe-area-inset-bottom)); background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); z-index: 1000; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); font-size: 10px; font-weight: 600; width: 25%; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; }
+
+        /* GİZLİ ŞABLONLAR (Görünür ama arkada) */
+        .hidden-templates { position: fixed; top: 0; left: 0; z-index: -100; visibility: hidden; pointer-events: none; }
+        #storyTemplate { width: 400px; height: 711px; background: #050505; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+        
+        /* MODALLAR */
+        .full-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
+        .result-box { background: white; padding: 25px; border-radius: 20px; text-align: center; width: 100%; max-width: 300px; color: black; }
+    </style>
+</head>
+<body class="theme-nline">
+
+    <div id="splashScreen">
+        <div class="rpm-container">
+            <svg viewBox="0 0 300 300" style="width:100%; height:100%;">
+                <path d="M 60 240 A 110 110 0 1 1 240 240" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round"/>
+                <path d="M 60 240 A 110 110 0 1 1 240 240" fill="none" stroke="red" stroke-width="8" stroke-linecap="round" class="gauge-bar"/>
+                <line id="needle" x1="150" y1="150" x2="150" y2="50" stroke="white" stroke-width="4" transform="rotate(-120 150 150)"/>
+            </svg>
+            <div class="rpm-text-vip" style="position:absolute; top:180px; width:100%; text-align:center;">
+                <span id="rpmValue" style="font-size:40px; font-weight:800; color:white;">0</span>
+                <p style="color:red; font-size:12px; font-weight:800;">RPM</p>
+            </div>
+        </div>
+        <h1 class="splash-title-liquid-neon">YAKIT ASİSTANI</h1>
+    </div>
+
+    <div id="resultModal" class="full-overlay">
+        <div class="result-box">
+            <h3 id="resultTitle">Hazır!</h3>
+            <p id="resultDesc" style="font-size:12px; margin: 10px 0;">İşlem tamamlandı.</p>
+            <img id="resultImg" style="width:100%; border-radius:10px; display:none; margin-bottom:15px;">
+            <a id="resultLink" href="#" class="btn" style="text-decoration:none; display:none;">İndir / Aç</a>
+            <button class="btn btn-outline" onclick="closeModal()">Kapat</button>
+        </div>
+    </div>
+
+    <div class="hidden-templates">
+        <div id="storyTemplate">
+            <img id="stPic" src="" style="width:120px; height:120px; border-radius:50%; border:4px solid white; margin-bottom:20px;">
+            <h2 id="stName" style="font-size:24px;">Sürücü</h2>
+            <div id="stPlate" style="background:red; padding:5px 15px; border-radius:8px; margin:10px 0;">PLAKA</div>
+            <div style="background:#111; padding:20px; border-radius:15px; width:100%; margin-top:30px; border:1px solid #333;">
+                <p style="color:#aaa; font-size:12px;">YAKIT ORTALAMASI</p>
+                <h3 id="stAvg" style="font-size:32px; color:lime;">0.0 L</h3>
+            </div>
+            <p style="margin-top:auto; font-size:10px; color:#555;">VIP Yakıt Takip Asistanı Pro</p>
+        </div>
+    </div>
+
+    <div class="top-bar">
+        <div class="app-brand">Yakıt Takip Asistanı</div>
+        <div class="privacy-btn" onclick="togglePrivacy()"><i class="fas fa-eye-slash" id="pIcon"></i></div>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none;">
+        <div class="header-top">
+            <div class="greeting-box">
+                <p id="timeMsg">Merhaba,</p>
+                <h1 id="userName">Sürücü <span id="userPlate" class="plaka-badge"></span></h1>
+            </div>
+            <div class="profile-pic-container" onclick="switchProfile()">
+                <img id="headerPic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJhNSA1IDAgMSAwIDAgMTAgNSA1IDAgMCAwIDAtMTB6bTAgMTJjLTMuMyAwLTkuOSAxLjctOS45IDVWMThoMTkuOFYxOWMwLTMuMy02LjYtNS05LjktNXoiLz48L3N2Zz4=" class="profile-pic-large">
+                <div class="vehicle-badge" id="vBadge"><i class="fas fa-car"></i></div>
+            </div>
+        </div>
+
+        <div id="tab-home" class="tab-content active">
+            <div class="top-action-row">
+                <button class="btn-action-top btn-story" onclick="genStory()"><i class="fab fa-instagram"></i> Story</button>
+            </div>
+            
+            <div class="card">
+                <div class="score-card">
+                    <div class="score-info">
+                        <h4>Sürüş Skoru</h4>
+                        <p id="scoreLabel">Veri bekleniyor...</p>
+                    </div>
+                    <div class="score-badge" id="scoreNum">-</div>
+                </div>
+            </div>
+
+            <div class="dashboard">
+                <div class="stat-card card"><i class="fas fa-leaf"></i><p>Ortalama</p><h3 id="dAvg">- L</h3></div>
+                <div class="stat-card card"><i class="fas fa-wallet"></i><p>Harcama</p><h3 id="dTotal" class="money-blur">0 ₺</h3></div>
+            </div>
+            
+            <div class="card"><canvas id="mainChart" style="height:150px;"></canvas></div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="smart-actions" style="display:flex; gap:10px; margin-bottom:15px;">
+                <button class="btn" style="flex:1;" onclick="document.getElementById('ocrIn').click()"><i class="fas fa-camera"></i> Fiş Tara</button>
+                <input type="file" id="ocrIn" style="display:none;" accept="image/*" onchange="ocrProcess(event)">
+            </div>
+            <div class="card">
+                <div class="input-group"><label>Tarih</label><input type="date" id="fDate"></div>
+                <div class="input-group"><label>KM</label><input type="number" id="fKm" placeholder="15000"></div>
+                <div class="input-group"><label>Litre</label><input type="number" step="0.01" id="fLtr" placeholder="35.5"></div>
+                <div class="input-group"><label>Fiyat (₺)</label><input type="number" step="0.01" id="fPrc" placeholder="43.5"></div>
+                <button class="btn" onclick="addEntry()">Kaydet</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <button class="btn btn-outline" style="margin-bottom:15px;" onclick="genPDF()"><i class="fas fa-file-pdf"></i> PDF Rapor Al</button>
+            <div class="card">
+                <table style="width:100%; font-size:12px; border-collapse:collapse;" id="hTable">
+                    <thead><tr style="text-align:left; color:var(--primary);"><th>Tarih</th><th>KM</th><th>Tutar</th><th>Sil</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-settings" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Görsel Garaj</h2>
+                <div class="visual-garage">
+                    <div class="car-view">
+                        <div class="tire tire-fl"></div><div class="psi-label" style="top:15px; left:-50px;" id="p-fl">--</div>
+                        <div class="tire tire-fr"></div><div class="psi-label" style="top:15px; right:-50px;" id="p-fr">--</div>
+                        <div class="tire tire-rl"></div><div class="psi-label" style="bottom:15px; left:-50px;" id="p-rl">--</div>
+                        <div class="tire tire-rr"></div><div class="psi-label" style="bottom:15px; right:-50px;" id="p-rr">--</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <div class="input-group"><label>Ön PSI</label><input type="number" id="psiF"></div>
+                    <div class="input-group"><label>Arka PSI</label><input type="number" id="psiR"></div>
+                </div>
+                <div class="input-group"><label>Ad Soyad</label><input type="text" id="pName"></div>
+                <div class="input-group"><label>Plaka</label><input type="text" id="pPlate"></div>
+                <button class="btn" onclick="saveSettings()">Ayarları Kaydet</button>
+            </div>
+            <button class="btn btn-black" style="background:#111;" onclick="localStorage.clear(); location.reload();">Sıfırla</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="nav('home', this)"><i class="fas fa-home"></i>Ana Sayfa</div>
+        <div class="nav-item" onclick="nav('add', this)"><i class="fas fa-plus-circle"></i>Ekle</div>
+        <div class="nav-item" onclick="nav('history', this)"><i class="fas fa-history"></i>Geçmiş</div>
+        <div class="nav-item" onclick="nav('settings', this)"><i class="fas fa-cog"></i>Ayarlar</div>
+    </div>
+
+<script>
+    // --- VERİ YÖNETİMİ ---
+    let profile = localStorage.getItem('vP') || 'car';
+    let data = JSON.parse(localStorage.getItem('vD_' + profile)) || [];
+    let settings = JSON.parse(localStorage.getItem('vS_' + profile)) || { name: 'Sürücü', plate: '', psiF: '', psiR: '', img: '' };
+    let chart;
+
+    function nav(id, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+        if(id === 'home') updateUI();
+    }
+
+    function switchProfile() {
+        profile = profile === 'car' ? 'moto' : 'car';
+        localStorage.setItem('vP', profile);
+        location.reload();
+    }
+
+    function updateUI() {
+        document.getElementById('userName').innerText = settings.name;
+        document.getElementById('vBadge').innerHTML = profile === 'car' ? '<i class="fas fa-car"></i>' : '<i class="fas fa-motorcycle"></i>';
+        document.getElementById('p-fl').innerText = settings.psiF || '--';
+        document.getElementById('p-fr').innerText = settings.psiF || '--';
+        document.getElementById('p-rl').innerText = settings.psiR || '--';
+        document.getElementById('p-rr').innerText = settings.psiR || '--';
+        
+        let total = data.reduce((sum, e) => sum + (e.ltr * e.prc), 0);
+        document.getElementById('dTotal').innerText = total.toFixed(0) + " ₺";
+        
+        // Tabloyu Doldur
+        let tbody = document.querySelector('#hTable tbody');
+        tbody.innerHTML = '';
+        data.slice().reverse().forEach((e, i) => {
+            tbody.innerHTML += `<tr><td>${e.date}</td><td>${e.km}</td><td>${(e.ltr*e.prc).toFixed(1)}₺</td><td><i class="fas fa-trash" onclick="del(${data.length-1-i})"></i></td></tr>`;
+        });
+    }
+
+    function addEntry() {
+        let entry = {
+            date: document.getElementById('fDate').value,
+            km: parseInt(document.getElementById('fKm').value),
+            ltr: parseFloat(document.getElementById('fLtr').value),
+            prc: parseFloat(document.getElementById('fPrc').value)
+        };
+        if(!entry.date || isNaN(entry.km)) return alert("Eksik bilgi!");
+        data.push(entry);
+        localStorage.setItem('vD_' + profile, JSON.stringify(data));
+        nav('home', document.querySelector('.nav-item'));
+    }
+
+    function saveSettings() {
+        settings.name = document.getElementById('pName').value;
+        settings.plate = document.getElementById('pPlate').value;
+        settings.psiF = document.getElementById('psiF').value;
+        settings.psiR = document.getElementById('psiR').value;
+        localStorage.setItem('vS_' + profile, JSON.stringify(settings));
+        alert("Kaydedildi!");
+        updateUI();
+    }
+
+    function togglePrivacy() {
+        document.body.classList.toggle('privacy-mode');
+        localStorage.setItem('privacy_mode', document.body.classList.contains('privacy-mode'));
+    }
+
+    // --- STORY VE PDF (KESİN ÇÖZÜM) ---
+    async function genStory() {
+        const template = document.getElementById('storyTemplate');
+        const modal = document.getElementById('resultModal');
+        const resImg = document.getElementById('resultImg');
+        
+        // Verileri şablona bas
+        document.getElementById('stName').innerText = settings.name;
+        document.getElementById('stPlate').innerText = settings.plate || "VIP";
+        document.getElementById('stPic').src = settings.img || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJhNSA1IDAgMSAwIDAgMTAgNSA1IDAgMCAwIDAtMTB6bTAgMTJjLTMuMyAwLTkuOSAxLjctOS45IDVWMThoMTkuOFYxOWMwLTMuMy02LjYtNS05LjktNXoiLz48L3N2Zz4=";
+        
+        modal.style.display = 'flex';
+        document.getElementById('resultTitle').innerText = "Hazırlanıyor...";
+
+        setTimeout(async () => {
+            const canvas = await html2canvas(template, { scale: 2, logging: false, useCORS: true });
+            resImg.src = canvas.toDataURL("image/png");
+            resImg.style.display = 'block';
+            document.getElementById('resultTitle').innerText = "Story Hazır!";
+            document.getElementById('resultDesc').innerText = "Fotoğrafı basılı tutup kaydedin.";
+        }, 500);
+    }
+
+    async function genPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("Yakit Takip Raporu - " + settings.name, 10, 10);
+        let y = 20;
+        data.forEach(e => {
+            doc.text(`${e.date} | ${e.km} KM | ${e.ltr} L | ${(e.ltr*e.prc).toFixed(2)} TL`, 10, y);
+            y += 10;
+        });
+        
+        const modal = document.getElementById('resultModal');
+        modal.style.display = 'flex';
+        document.getElementById('resultTitle').innerText = "PDF Hazır!";
+        const link = document.getElementById('resultLink');
+        link.href = doc.output('bloburl');
+        link.style.display = 'block';
+        link.innerText = "PDF'i Aç / İndir";
+    }
+
+    function closeModal() {
+        document.getElementById('resultModal').style.display = 'none';
+        document.getElementById('resultImg').style.display = 'none';
+        document.getElementById('resultLink').style.display = 'none';
+    }
+
+    // --- RPM MOTORU ---
+    function uygulamayiBaslat() {
+        let rpm = 0;
+        let target = 8000;
+        let timer = setInterval(() => {
+            rpm += 160;
+            if(rpm >= target) {
+                rpm = target;
+                clearInterval(timer);
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splashScreen').style.display = 'none';
+                        document.getElementById('mainApp').style.display = 'block';
+                        updateUI();
+                    }, 800);
+                }, 1000);
+            }
+            document.getElementById('rpmValue').innerText = Math.floor(rpm);
+            document.getElementById('needle').setAttribute('transform', `rotate(${-120 + (rpm/8000)*240} 150 150)`);
+        }, 30);
+        document.getElementById('fDate').valueAsDate = new Date();
+    }
+</script>
+
+</body>
+</html>
