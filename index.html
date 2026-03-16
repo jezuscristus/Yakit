@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakıt Takip Asistanı Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#002c5f">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Yakıt Takip">
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+            --tilt-x: 0deg; --tilt-y: 0deg;
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+        body.theme-nline {
+            --primary: #e63946; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%);
+            --glass-bg: rgba(30, 30, 30, 0.8); --glass-border: rgba(230, 57, 70, 0.3);
+            --text-main: #f1f1f1; --text-muted: #aaaaaa; --input-bg: rgba(15, 15, 15, 0.9);
+        }
+        body.theme-elite {
+            --primary: #b0bec5; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #263238 0%, #101418 100%);
+            --glass-bg: rgba(40, 50, 56, 0.7); --glass-border: rgba(176, 190, 197, 0.2);
+            --text-main: #eceff1; --text-muted: #90a4ae; --input-bg: rgba(20, 26, 30, 0.8);
+        }
+        body.theme-eco {
+            --primary: #2ecc71; --accent: #f1c40f;
+            --bg-grad: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            --glass-bg: rgba(20, 35, 30, 0.7); --glass-border: rgba(46, 204, 113, 0.2);
+            --text-main: #ffffff; --text-muted: #a3c2b1; --input-bg: rgba(10, 20, 15, 0.8);
+        }
+
+        /* Firebase Özel Stiller */
+        .cloud-card { background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), var(--glass-bg)) !important; border: 1px solid rgba(66, 133, 244, 0.3) !important; }
+        .btn-google { background: #fff; color: #444; border: none; border-radius: 12px; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: 0.2s; font-size: 13px; margin-top: 10px; }
+        .btn-google:active { transform: scale(0.96); }
+        .user-sync-info { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .user-meta { display: flex; align-items: center; gap: 10px; }
+        .user-meta img { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--primary); }
+        .sync-indicator { font-size: 10px; color: #2ecc71; font-weight: 800; display: block; }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html { background: var(--bg-grad); height: 100%; overflow: hidden; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); transition: all 0.5s ease; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; perspective: 1000px; }
+        
+        body.privacy-mode .money-blur { filter: blur(6px); opacity: 0.6; pointer-events: none; user-select: none; transition: 0.3s ease; }
+
+        /* AÇILIŞ EKRANI */
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: all 0.8s ease-in-out; }
+        .rpm-container-vip { position: relative; width: 320px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; margin-top: -60px; transition: opacity 0.4s ease, transform 0.4s ease; }
+        .rpm-gauge-vip { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: visible; }
+        .gauge-bar-vip { stroke-width: 12; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: 520; animation: revUpVIP 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        #needle { transform-origin: 160px 160px; transform: rotate(-135deg); transition: transform 0.05s linear; }
+        .rpm-text-vip { position: absolute; top: 190px; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+        #rpmValueVip { font-size: 55px; font-weight: 800; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); line-height: 1; }
+        .rpm-text-vip small { font-size: 14px; color: #e74c3c; font-weight: 800; letter-spacing: 4px; margin-top: 5px; }
+
+        @keyframes revUpVIP { 0% { stroke-dashoffset: 520; filter: drop-shadow(0 0 10px rgba(46,204,113,0.8)); } 100% { stroke-dashoffset: 0; filter: drop-shadow(0 0 15px rgba(231,76,60,0.9)); } }
+
+        .splash-title-container-vip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; width: 100%; z-index: 2; pointer-events: none; }
+        .splash-title-liquid-neon { font-size: 34px; font-weight: 800; letter-spacing: 5px; margin: 0; opacity: 0; text-align: center; line-height: 1.4; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.15); background: linear-gradient(90deg, var(--primary), var(--accent), #ffffff, var(--primary)); background-size: 300% 100%; -webkit-background-clip: text; filter: drop-shadow(0 0 15px var(--primary)); transform: scale(0.9); }
+        .neon-slide { opacity: 1; transform: scale(1); transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1); animation: liquidFlow 3s linear infinite; }
+        @keyframes liquidFlow { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+        .main-content { display: block; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; padding-bottom: calc(95px + env(safe-area-inset-bottom)); width: 100%; }
+        .tab-content { display: none; width: 100%; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .top-bar-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; width: 100%; position: relative; height: 30px;}
+        .app-top-brand { position: absolute; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.05); margin: 0; white-space: nowrap;}
+        
+        .privacy-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main); padding: 5px 12px; border-radius: 12px; font-size: 14px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; z-index: 10;}
+        .privacy-btn:active { transform: scale(0.9); }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
+        .greeting-box { display: flex; flex-direction: column; flex: 1;}
+        .greeting-box p { font-size: 14px; color: var(--text-muted); margin: 0; font-weight: 600;}
+        .greeting-box h1 { font-size: 22px; font-weight: 800; margin: 0; color: var(--text-main); display: flex; align-items: center; flex-wrap: wrap; gap: 8px;}
+        .plaka-badge { font-size: 11px; background: var(--primary); color: #fff; padding: 3px 8px; border-radius: 6px; letter-spacing: 1px; white-space: nowrap; }
+        
+        .profile-pic-container { position: relative; cursor: pointer; transition: 0.3s; margin-left: 10px; }
+        .profile-pic-large { width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; box-shadow: 0 6px 18px rgba(0,0,0,0.2); background: white;}
+        .vehicle-badge { position: absolute; bottom: -5px; right: -5px; background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--glass-bg); font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(75px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--glass-bg); backdrop-filter: blur(15px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; width: 25%; }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; transition: 0.3s; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item.active i { transform: translateY(-4px) scale(1.1); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; overflow: hidden; width: 100%;}
+        .card-title { font-size: 16px; margin-bottom: 15px; padding-bottom: 5px; color: var(--primary); font-weight: 800; display: flex; align-items: center; gap: 8px; border: none; letter-spacing: 0.5px;}
+        
+        .score-card { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(0,0,0,0.05)); border: 1px solid var(--glass-border); padding: 15px 20px; border-radius: 15px; margin-bottom: 20px; width: 100%; box-sizing: border-box;}
+        .score-badge { font-size: 28px; font-weight: 800; color: var(--primary); }
+
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; width: 100%;}
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); text-align: center; padding: 15px; border-radius: 20px; display: flex; flex-direction: column; justify-content: center; }
+        .stat-card i { font-size: 22px; color: var(--primary); margin-bottom: 8px; }
+        .stat-card h3 { font-size: 18px; color: var(--text-main); font-weight: 800; }
+        
+        .input-group { margin-bottom: 12px; width: 100%; box-sizing: border-box; }
+        .input-group label { font-size: 12px; margin-bottom: 5px; color: var(--text-muted); font-weight: 600; display: block; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid var(--glass-border); border-radius: 12px; font-size: 14px; outline: none; background: var(--input-bg); color: var(--text-main); }
+        
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; transition: 0.2s;}
+        .btn:active { transform: scale(0.97); }
+        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+
+        .visual-garage { position: relative; width: 100%; height: 280px; background: rgba(0,0,0,0.05); border: 1px solid var(--glass-border); border-radius: 20px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; overflow: hidden; }
+        .car-top-view { position: relative; width: 100px; height: 220px; background: linear-gradient(to bottom, var(--primary) 0%, #1a1a1a 100%); border-radius: 30px; }
+        .tire { position: absolute; width: 20px; height: 45px; background: #222; border-radius: 5px; z-index: 1;}
+        .tire-fl { top: 25px; left: -10px; } .tire-fr { top: 25px; right: -10px; }
+        .tire-rl { bottom: 25px; left: -10px; } .tire-rr { bottom: 25px; right: -10px; }
+        .psi-badge { position: absolute; background: var(--glass-bg); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1px solid var(--glass-border); z-index: 3;}
+        .psi-fl { top: 20px; left: -60px; } .psi-fr { top: 20px; right: -60px; }
+        .psi-rl { bottom: 20px; left: -60px; } .psi-rr { bottom: 20px; right: -60px; }
+
+        .table-responsive { overflow-x: auto; width: 100%;}
+        table { width: 100%; border-collapse: collapse; font-size: 11px; color: var(--text-main); }
+        th, td { padding: 12px 5px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+
+        /* Modals */
+        #ocrOverlay, #voiceOverlay, #cropperModal, .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 10000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px;}
+    </style>
+</head>
+<body onload="uygulamayiBaslat()">
+
+    <div id="splashScreen">
+        <div class="rpm-container-vip">
+            <svg class="rpm-gauge-vip" viewBox="0 0 320 320">
+                <defs>
+                    <linearGradient id="multiColorGradient" x1="0%" y1="100%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#2ecc71" /><stop offset="50%" stop-color="#4facfe" /><stop offset="100%" stop-color="#e74c3c" />
+                    </linearGradient>
+                </defs>
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round"/>
+                <path class="gauge-bar-vip" d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="url(#multiColorGradient)" />
+                <g id="needle">
+                    <polygon points="157,160 163,160 160,55" fill="#fff"/>
+                    <circle cx="160" cy="160" r="16" fill="#050505" stroke="#333" stroke-width="4"/>
+                </g>
+            </svg>
+            <div class="rpm-text-vip"><span id="rpmValueVip">0</span> <small>RPM</small></div>
+        </div>
+        <div class="splash-title-container-vip">
+            <h1 class="splash-title-liquid-neon">YAKIT TAKİP<br>ASİSTANI</h1>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none;">
+        <div class="top-bar-container">
+            <div style="width: 32px;"></div>
+            <div class="app-top-brand"><i class="fas fa-gas-pump"></i> Yakıt Takip Asistanı</div>
+            <div class="privacy-btn" onclick="togglePrivacy()"><i class="fas fa-eye-slash" id="privacyIcon"></i></div>
+        </div>
+
+        <div class="header-top">
+            <div class="greeting-box">
+                <p id="tarihGosterge">İyi Sürüşler,</p>
+                <h1 id="kullaniciGosterge">Sürücü <span id="plakaGosterge" class="plaka-badge" style="display:none;"></span></h1>
+            </div>
+            <div class="profile-pic-container" onclick="switchVehicleProfile()">
+                <img src="" alt="Profil" class="profile-pic-large" id="headerProfilePic">
+                <div class="vehicle-badge" id="vehicleBadge"><i class="fas fa-car"></i></div>
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="score-card">
+                <div><h4>Sürüş Verimliliği</h4><p id="scoreText">Veri bekliyor...</p></div>
+                <div class="score-badge" id="scoreBadge">-</div>
+            </div>
+            <div class="dashboard">
+                <div class="stat-card"><i class="fas fa-leaf"></i><p>Ortalama</p><h3 id="dashAvg">- L</h3></div>
+                <div class="stat-card"><i class="fas fa-wallet"></i><p>Harcama</p><h3 id="dashTotalCost" class="money-val money-blur">0 ₺</h3></div>
+                <div class="stat-card"><i class="fas fa-gas-pump"></i><p>Menzil</p><h3 id="dashRange">- KM</h3></div>
+                <div class="stat-card"><i class="fas fa-coins"></i><p>TL/KM</p><h3 id="dashCostPerKm" class="money-val money-blur">- ₺</h3></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-line"></i> Tüketim Grafiği</h2>
+                <canvas id="yakitGrafigi" style="height: 180px;"></canvas>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-plus-circle"></i> Yakıt Ekle</h2>
+                <div class="input-group"><label>Tarih</label><input type="date" id="tarih"></div>
+                <div class="input-group"><label>İstasyon</label><select id="istasyon"><option>Shell</option><option>Opet</option><option>BP</option><option>Total</option></select></div>
+                <div class="input-group"><label>KM</label><input type="number" id="km" placeholder="Mevcut Kilometre"></div>
+                <div class="input-group"><label>Litre</label><input type="number" step="0.01" id="litre" placeholder="Alınan Litre"></div>
+                <div class="input-group"><label>Birim Fiyat</label><input type="number" step="0.01" id="fiyat" placeholder="₺ / Litre"></div>
+                <button class="btn" onclick="veriEkle()"><i class="fas fa-save"></i> Kaydet</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-history"></i> Kayıtlar</h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Tarih</th><th>İstasyon</th><th>KM</th><th>Tutar</th><th>Sil</th></tr></thead>
+                        <tbody id="tabloGövdesi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-profile" class="tab-content">
+            <div class="card cloud-card">
+                <h2 class="card-title" style="color: #4285F4;"><i class="fas fa-cloud-upload-alt"></i> Bulut Senkronizasyonu</h2>
+                
+                <div id="loggedOutUI">
+                    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Verilerinizi yedeklemek için Google ile giriş yapın.</p>
+                    <button class="btn-google" onclick="firebaseGirisYap()">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" width="18" alt="G">
+                        Google ile Giriş Yap
+                    </button>
+                </div>
+
+                <div id="loggedInUI" style="display: none;">
+                    <div class="user-sync-info">
+                        <div class="user-meta">
+                            <img id="userPhoto" src="" alt="U">
+                            <div>
+                                <h4 id="userName" style="font-size: 13px; margin: 0;">Sürücü</h4>
+                                <span class="sync-indicator" id="syncStatus">Bulut Eşitlendi</span>
+                            </div>
+                        </div>
+                        <button onclick="firebaseCikisYap()" style="background:none; border:none; color:var(--accent); font-weight:800; font-size:12px; cursor:pointer;">Çıkış</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-palette"></i> Arayüz Teması</h2>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn-outline" style="padding: 8px 12px; font-size: 11px;" onclick="temaSec('standart')">Gündüz</button>
+                    <button class="btn-outline" style="padding: 8px 12px; font-size: 11px;" onclick="temaSec('gece')">Gece</button>
+                    <button class="btn-outline" style="padding: 8px 12px; font-size: 11px;" onclick="temaSec('elite')">Elite</button>
+                    <button class="btn-outline" style="padding: 8px 12px; font-size: 11px;" onclick="temaSec('nline')">N-Line</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-car"></i> Garaj Ayarları</h2>
+                <div class="input-group"><label>Plaka</label><input type="text" id="plakaNo" placeholder="34 ABC 123"></div>
+                <div class="visual-garage">
+                    <div class="car-top-view">
+                        <div class="tire tire-fl"></div><div class="psi-badge psi-fl">32</div>
+                        <div class="tire tire-fr"></div><div class="psi-badge psi-fr">32</div>
+                        <div class="tire tire-rl"></div><div class="psi-badge psi-rl">30</div>
+                        <div class="tire tire-rr"></div><div class="psi-badge psi-rr">30</div>
+                    </div>
+                </div>
+                <button class="btn" onclick="profilKaydet()">Ayarları Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="sekmeDegistir('dashboard', this)"><i class="fas fa-home"></i><span>Ana Sayfa</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('add', this)"><i class="fas fa-plus-circle"></i><span>Yakıt Ekle</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('history', this)"><i class="fas fa-list"></i><span>Geçmiş</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('profile', this)"><i class="fas fa-user-cog"></i><span>Ayarlar</span></div>
+    </div>
+
+    <script>
+        // --- FIREBASE KONFİGÜRASYONU (Buraları doldurmalısın!) ---
+        const firebaseConfig = {
+            apiKey: "API_KEY_BURAYA",
+            authDomain: "PROJEN.firebaseapp.com",
+            projectId: "PROJEN",
+            storageBucket: "PROJEN.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let activeProfile = localStorage.getItem('app_active_profile') || 'car'; 
+        let yakitVerileri = []; let profilVerileri = {};
+        let yakitGrafigi;
+
+        // Firebase Giriş/Çıkış
+        function firebaseGirisYap() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(e => alert("Hata: " + e.message));
+        }
+        function firebaseCikisYap() { auth.signOut(); location.reload(); }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('loggedOutUI').style.display = 'none';
+                document.getElementById('loggedInUI').style.display = 'block';
+                document.getElementById('userName').innerText = user.displayName;
+                document.getElementById('userPhoto').src = user.photoURL;
+                bulutSenkronizasyonu(user.uid);
+            }
+        });
+
+        async function bulutSenkronizasyonu(uid) {
+            const docRef = db.collection("users").doc(uid);
+            const status = document.getElementById('syncStatus');
+            
+            // Buluttan veri çek
+            const doc = await docRef.get();
+            if (doc.exists) {
+                const cloudData = doc.data();
+                if (cloudData.car_data && yakitVerileri.length === 0) {
+                    yakitVerileri = cloudData.car_data;
+                    saveProfileData();
+                    ekraniGuncelle();
+                }
+            }
+            
+            // Yereli buluta yedekle (Her 5 saniyede veya veri değişince de yapılabilir)
+            await docRef.set({
+                car_data: yakitVerileri,
+                lastSync: new Date().toISOString()
+            }, { merge: true });
+            status.innerText = "Bulut Eşitlendi ✓";
+        }
+
+        // --- UYGULAMA MANTIĞI ---
+        function uygulamayiBaslat() {
+            loadProfileData();
+            let rpmElement = document.getElementById("rpmValueVip");
+            let needle = document.getElementById("needle");
+            let start = null;
+
+            function rpmStep(timestamp) {
+                if (!start) start = timestamp;
+                let progress = timestamp - start;
+                let currentRpm = Math.min((progress / 2000) * 8000, 8000);
+                let angle = -135 + (currentRpm / 8000) * 270;
+                needle.style.transform = `rotate(${angle}deg)`;
+                rpmElement.innerText = Math.floor(currentRpm);
+                if (progress < 2000) window.requestAnimationFrame(rpmStep);
+                else bitirSplash();
+            }
+            window.requestAnimationFrame(rpmStep);
+        }
+
+        function bitirSplash() {
+            document.querySelector('.splash-title-liquid-neon').classList.add('neon-slide');
+            setTimeout(() => {
+                document.getElementById('splashScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    ekraniGuncelle();
+                }, 800);
+            }, 1500);
+        }
+
+        function loadProfileData() {
+            yakitVerileri = JSON.parse(localStorage.getItem('app_data_' + activeProfile)) || [];
+            profilVerileri = JSON.parse(localStorage.getItem('app_profile_' + activeProfile)) || { ad: 'Sürücü', plaka: '', yakitTipi: 'Benzin' };
+            profilYukle();
+        }
+
+        function saveProfileData() {
+            localStorage.setItem('app_data_' + activeProfile, JSON.stringify(yakitVerileri));
+            localStorage.setItem('app_profile_' + activeProfile, JSON.stringify(profilVerileri));
+            if(auth.currentUser) bulutSenkronizasyonu(auth.currentUser.uid);
+        }
+
+        function sekmeDegistir(sekme, el) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + sekme).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            if(sekme === 'dashboard') ekraniGuncelle();
+        }
+
+        function temaSec(tema) {
+            document.body.className = '';
+            if(tema !== 'standart') document.body.classList.add('theme-' + tema);
+            localStorage.setItem('i20_tema', tema);
+        }
+
+        function togglePrivacy() {
+            document.body.classList.toggle('privacy-mode');
+            let icon = document.getElementById('privacyIcon');
+            icon.className = document.body.classList.contains('privacy-mode') ? "fas fa-eye" : "fas fa-eye-slash";
+        }
+
+        function veriEkle() {
+            let t = document.getElementById('tarih').value;
+            let k = parseFloat(document.getElementById('km').value);
+            let l = parseFloat(document.getElementById('litre').value);
+            let f = parseFloat(document.getElementById('fiyat').value);
+            if(!t || isNaN(k)) return alert("Eksik bilgi!");
+            
+            yakitVerileri.push({ id: Date.now(), tarih: t, istasyon: document.getElementById('istasyon').value, km: k, litre: l, tutar: (l*f).toFixed(2) });
+            saveProfileData();
+            ekraniGuncelle();
+            sekmeDegistir('dashboard', document.querySelector('.nav-item'));
+        }
+
+        function ekraniGuncelle() {
+            let tablo = document.getElementById('tabloGövdesi'); tablo.innerHTML = "";
+            let toplamTutar = 0;
+            yakitVerileri.slice().reverse().forEach(v => {
+                toplamTutar += parseFloat(v.tutar);
+                tablo.innerHTML += `<tr><td>${v.tarih}</td><td>${v.istasyon}</td><td>${v.km}</td><td class="money-blur">${v.tutar}₺</td><td><i class="fas fa-trash" onclick="sil(${v.id})"></i></td></tr>`;
+            });
+            document.getElementById('dashTotalCost').innerText = toplamTutar.toFixed(0) + " ₺";
+            grafikCiz();
+        }
+
+        function grafikCiz() {
+            let ctx = document.getElementById('yakitGrafigi').getContext('2d');
+            if(yakitGrafigi) yakitGrafigi.destroy();
+            yakitGrafigi = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: yakitVerileri.map(v => v.tarih),
+                    datasets: [{ data: yakitVerileri.map(v => v.km), borderColor: '#002c5f', tension: 0.4, fill: true }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
+            });
+        }
+
+        function profilYukle() {
+            document.getElementById('plakaGosterge').innerText = profilVerileri.plaka;
+            document.getElementById('plakaGosterge').style.display = profilVerileri.plaka ? 'inline-block' : 'none';
+            document.getElementById('headerProfilePic').src = "https://www.w3schools.com/howto/img_avatar.png";
+        }
+
+        function profilKaydet() {
+            profilVerileri.plaka = document.getElementById('plakaNo').value;
+            saveProfileData();
+            profilYukle();
+            alert("Kaydedildi!");
+        }
+    </script>
+</body>
+</html>
