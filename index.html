@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakıt Takip Asistanı Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#002c5f">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Yakıt Takip">
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+            --tilt-x: 0deg; --tilt-y: 0deg;
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+        body.theme-nline {
+            --primary: #e63946; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%);
+            --glass-bg: rgba(30, 30, 30, 0.8); --glass-border: rgba(230, 57, 70, 0.3);
+            --text-main: #f1f1f1; --text-muted: #aaaaaa; --input-bg: rgba(15, 15, 15, 0.9);
+        }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html { background: var(--bg-grad); height: 100%; overflow: hidden; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); transition: all 0.5s ease; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; perspective: 1000px; }
+        
+        body.privacy-mode .money-blur { filter: blur(6px); opacity: 0.6; pointer-events: none; user-select: none; transition: 0.3s ease; }
+
+        /* AÇILIŞ EKRANI */
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: all 0.8s ease-in-out; }
+        .rpm-container-vip { position: relative; width: 320px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; margin-top: -60px; transition: opacity 0.4s ease, transform 0.4s ease; }
+        .rpm-gauge-vip { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: visible; }
+        .gauge-bar-vip { stroke-width: 12; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: 520; animation: revUpVIP 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        #needle { transform-origin: 160px 160px; transform: rotate(-135deg); transition: transform 0.05s linear; }
+        .rpm-text-vip { position: absolute; top: 190px; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+        #rpmValueVip { font-size: 55px; font-weight: 800; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); line-height: 1; }
+        .rpm-text-vip small { font-size: 14px; color: #e74c3c; font-weight: 800; letter-spacing: 4px; margin-top: 5px; }
+
+        @keyframes revUpVIP { 0% { stroke-dashoffset: 520; filter: drop-shadow(0 0 10px rgba(46,204,113,0.8)); } 100% { stroke-dashoffset: 0; filter: drop-shadow(0 0 15px rgba(231,76,60,0.9)); } }
+
+        .splash-title-container-vip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; width: 100%; z-index: 2; pointer-events: none; }
+        .splash-title-liquid-neon { font-size: 34px; font-weight: 800; letter-spacing: 5px; margin: 0; opacity: 0; text-align: center; line-height: 1.4; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.15); background: linear-gradient(90deg, var(--primary), var(--accent), #ffffff, var(--primary)); background-size: 300% 100%; -webkit-background-clip: text; filter: drop-shadow(0 0 15px var(--primary)); transform: scale(0.9); }
+        .neon-slide { opacity: 1; transform: scale(1); transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1); animation: liquidFlow 3s linear infinite; }
+        @keyframes liquidFlow { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+        .main-content { display: block; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; padding-bottom: calc(95px + env(safe-area-inset-bottom)); width: 100%; }
+        .tab-content { display: none; width: 100%; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .parallax-target { transform: rotateX(var(--tilt-y)) rotateY(var(--tilt-x)); transition: transform 0.1s ease-out; }
+        
+        .top-bar-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; width: 100%; position: relative; height: 30px;}
+        .app-top-brand { position: absolute; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.05); margin: 0; white-space: nowrap;}
+        
+        .privacy-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main); padding: 5px 12px; border-radius: 12px; font-size: 14px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; z-index: 10;}
+        .privacy-btn:active { transform: scale(0.9); }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
+        .greeting-box { display: flex; flex-direction: column; flex: 1;}
+        .greeting-box h1 { font-size: 22px; font-weight: 800; margin: 0; color: var(--text-main); display: flex; align-items: center; flex-wrap: wrap; gap: 8px;}
+        .plaka-badge { font-size: 11px; background: var(--primary); color: #fff; padding: 3px 8px; border-radius: 6px; letter-spacing: 1px; white-space: nowrap; }
+        
+        .profile-pic-large { width: 75px; height: 75px; min-width: 75px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; box-shadow: 0 6px 18px rgba(0,0,0,0.2); background: white; display: flex; align-items: center; justify-content: center; overflow: hidden;}
+        .profile-pic-large i { font-size: 35px; color: var(--text-muted); }
+        .vehicle-badge { position: absolute; bottom: -5px; right: -5px; background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--glass-bg); font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(75px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--glass-bg); backdrop-filter: blur(15px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; width: 25%; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; transition: 0.3s; }
+
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; overflow: hidden; width: 100%;}
+        .card-title { font-size: 16px; margin-bottom: 15px; padding-bottom: 5px; color: var(--primary); font-weight: 800; display: flex; align-items: center; gap: 8px; border: none;}
+        
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; width: 100%;}
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); text-align: center; padding: 15px; border-radius: 20px; display: flex; flex-direction: column; justify-content: center; }
+        .stat-card i { font-size: 22px; color: var(--primary); margin-bottom: 8px; }
+        .stat-card p { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 5px; text-transform: uppercase;}
+        .stat-card h3 { font-size: 18px; color: var(--text-main); font-weight: 800; }
+        
+        .chart-container { position: relative; height: 200px; width: 100%; }
+        .chart-container-donut { position: relative; height: 220px; width: 100%; display: flex; justify-content: center;}
+
+        /* Firebase Auth Card */
+        .cloud-card { background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), var(--glass-bg)) !important; border: 1px solid rgba(66, 133, 244, 0.3) !important; }
+        .btn-google { background: #fff; color: #444; border: none; border-radius: 12px; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-size: 13px; margin-top: 10px; }
+        .user-sync-info { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+        .sync-text { font-size: 10px; font-weight: 800; display: block; color: #2ecc71; margin-top: 2px;}
+
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
+        .input-group { margin-bottom: 12px; width: 100%; box-sizing: border-box; }
+        .input-group label { font-size: 12px; margin-bottom: 5px; color: var(--text-muted); font-weight: 600; display: block; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid var(--glass-border); border-radius: 12px; font-size: 14px; outline: none; background: var(--input-bg); color: var(--text-main); }
+        
+        /* Modals */
+        #customConfirmModal, #pdfResultModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 25000; display: none; align-items: center; justify-content: center; padding: 20px;}
+        .modal-box { background: var(--glass-bg); padding: 30px; border-radius: 20px; text-align: center; width: 100%; border: 1px solid var(--glass-border); }
+
+        table { width: 100%; border-collapse: collapse; font-size: 11px; color: var(--text-main); }
+        th, td { padding: 10px 5px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+        .del-btn { color: var(--accent); background: none; border: none; font-size: 14px; cursor: pointer; }
+    </style>
+</head>
+<body onload="uygulamayiBaslat()">
+    <div id="splashScreen">
+        <div class="rpm-container-vip">
+            <svg class="rpm-gauge-vip" viewBox="0 0 320 320">
+                <defs>
+                    <linearGradient id="multiColorGradient" x1="0%" y1="100%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#2ecc71" /><stop offset="50%" stop-color="#4facfe" /><stop offset="100%" stop-color="#e74c3c" />
+                    </linearGradient>
+                </defs>
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round"/>
+                <path class="gauge-bar-vip" d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="url(#multiColorGradient)" />
+                <g id="needle">
+                    <polygon points="157,160 163,160 160,55" fill="#fff"/>
+                    <circle cx="160" cy="160" r="16" fill="#050505" stroke="#333" stroke-width="4"/>
+                </g>
+            </svg>
+            <div class="rpm-text-vip"><span id="rpmValueVip">0</span> <small>RPM</small></div>
+        </div>
+        <div class="splash-title-container-vip">
+            <h1 class="splash-title-liquid-neon">YAKIT TAKİP<br>ASİSTANI</h1>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none; opacity:0; transition: 0.8s ease;">
+        <div class="top-bar-container">
+            <div style="width: 32px;"></div>
+            <div class="app-top-brand parallax-target"><i class="fas fa-gas-pump"></i> Yakıt Takip Asistanı</div>
+            <div class="privacy-btn" onclick="togglePrivacy()"><i class="fas fa-eye-slash" id="privacyIcon"></i></div>
+        </div>
+
+        <div class="header-top parallax-target">
+            <div class="greeting-box">
+                <p id="tarihGosterge" style="font-size:12px; color:var(--text-muted); font-weight:600;">İyi Sürüşler,</p>
+                <h1 id="kullaniciGosterge">Sürücü <span id="plakaGosterge" class="plaka-badge" style="display:none;"></span></h1>
+            </div>
+            <div class="profile-pic-container" style="position:relative;" onclick="switchVehicleProfile()">
+                <div class="profile-pic-large" id="headerProfileBox">
+                    <i class="fas fa-user-circle" id="defaultProfileIcon"></i>
+                    <img id="headerProfilePic" src="" style="display:none; width:100%; height:100%; object-fit:cover;">
+                </div>
+                <div class="vehicle-badge" id="vehicleBadge"><i class="fas fa-car"></i></div>
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="dashboard">
+                <div class="stat-card"><i class="fas fa-leaf"></i><p>Ortalama</p><h3 id="dashAvg">- L</h3></div>
+                <div class="stat-card"><i class="fas fa-gas-pump"></i><p>Menzil</p><h3 id="dashRange">- KM</h3></div>
+                <div class="stat-card"><i class="fas fa-wallet"></i><p>Harcama</p><h3 id="dashTotalCost" class="money-val money-blur">0 ₺</h3></div>
+                <div class="stat-card"><i class="fas fa-coins"></i><p>TL / KM</p><h3 id="dashCostPerKm" class="money-val money-blur">- ₺</h3></div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-line"></i> Tüketim Trendi</h2>
+                <div class="chart-container"><canvas id="yakitGrafigi"></canvas></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-gas-pump"></i> İstasyon Sadakati</h2>
+                <div class="chart-container-donut"><canvas id="istasyonGrafigi"></canvas></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-bar"></i> Aylık Bütçe</h2>
+                <div class="chart-container"><canvas id="aylikGrafik"></canvas></div>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-plus-circle"></i> Yakıt Bilgileri</h2>
+                <div class="input-group"><label>Tarih</label><input type="date" id="tarih"></div>
+                <div class="input-group">
+                    <label>İstasyon</label>
+                    <select id="istasyon"><option>Shell</option><option>Opet</option><option>BP</option><option>Petrol Ofisi</option><option>Total</option><option>Diğer</option></select>
+                </div>
+                <div class="input-group"><label>Güncel KM</label><input type="number" id="km" placeholder="Örn: 15200"></div>
+                <div class="input-group"><label>Alınan Litre</label><input type="number" step="0.01" id="litre" placeholder="Örn: 35.5"></div>
+                <div class="input-group"><label>Litre Fiyatı (₺)</label><input type="number" step="0.01" id="fiyat" placeholder="Örn: 43.50"></div>
+                <button class="btn" onclick="veriEkle()"><i class="fas fa-save"></i> Kaydet</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-history"></i> Tüm Kayıtlar</h2>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead><tr><th>Tarih</th><th>İstasyon</th><th>KM</th><th>Tutar</th><th>Sil</th></tr></thead>
+                        <tbody id="tabloGövdesi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-profile" class="tab-content">
+            <div class="card cloud-card">
+                <h2 class="card-title" style="color: #4285F4;"><i class="fas fa-cloud-upload-alt"></i> Bulut Senkronizasyonu</h2>
+                <div id="loggedOutUI">
+                    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Verilerinizi yedeklemek için Google ile giriş yapın.</p>
+                    <button class="btn-google" onclick="firebaseGirisYap()">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" width="18" alt="G"> Google ile Giriş Yap
+                    </button>
+                </div>
+                <div id="loggedInUI" style="display: none;">
+                    <div class="user-sync-info">
+                        <div><h4 id="fbUserName" style="font-size: 13px;">Sürücü</h4><span class="sync-text" id="syncStatusBadge">Bulut Eşitlendi ✓</span></div>
+                        <button onclick="firebaseCikisYap()" style="background:none; border:none; color:var(--accent); font-weight:800; cursor:pointer;">Çıkış</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-palette"></i> Arayüz Teması</h2>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <button class="btn" onclick="temaSec('standart')">Gündüz</button>
+                    <button class="btn" onclick="temaSec('gece')">Gece</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="sekmeDegistir('dashboard', this)"><i class="fas fa-home"></i><span>Ana Sayfa</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('add', this)"><i class="fas fa-plus-circle"></i><span>Yakıt Ekle</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('history', this)"><i class="fas fa-list"></i><span>Geçmiş</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('profile', this)"><i class="fas fa-user-cog"></i><span>Ayarlar</span></div>
+    </div>
+
+<script>
+    // --- FIREBASE KONFİGÜRASYONU ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYJdXZLattRESMO-Udag_NV8KPtSexUiQ",
+      authDomain: "yakittakippro.firebaseapp.com",
+      projectId: "yakittakippro",
+      storageBucket: "yakittakippro.firebasestorage.app",
+      messagingSenderId: "73308208440",
+      appId: "1:73308208440:web:8d8a8bd8612a085eb615cd",
+      measurementId: "G-4MEL63NWM0"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let activeProfile = localStorage.getItem('app_active_profile') || 'car'; 
+    let yakitVerileri = [];
+    let yakitGrafigi, aylikGrafigi, istasyonGrafigi;
+
+    function titret(ms) { if ("vibrate" in navigator) { navigator.vibrate(ms); } }
+
+    // --- FIREBASE LOGIC ---
+    function firebaseGirisYap() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(e => alert("Giriş Hatası: " + e.message));
+    }
+
+    function firebaseCikisYap() {
+        auth.signOut().then(() => {
+            localStorage.clear();
+            location.reload();
+        });
+    }
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('loggedOutUI').style.display = 'none';
+            document.getElementById('loggedInUI').style.display = 'block';
+            document.getElementById('fbUserName').innerText = user.displayName;
+            document.getElementById('kullaniciGosterge').childNodes[0].nodeValue = user.displayName + " ";
+            
+            // Fotoğrafı Güncelle
+            const photoImg = document.getElementById('headerProfilePic');
+            const defaultIcon = document.getElementById('defaultProfileIcon');
+            if (user.photoURL) {
+                photoImg.src = user.photoURL;
+                photoImg.style.display = 'block';
+                defaultIcon.style.display = 'none';
+            }
+            
+            bulutVeriSenkronizeEt(user.uid);
+        } else {
+            document.getElementById('loggedOutUI').style.display = 'block';
+            document.getElementById('loggedInUI').style.display = 'none';
+        }
+    });
+
+    async function bulutVeriSenkronizeEt(uid) {
+        const status = document.getElementById('syncStatusBadge');
+        status.innerHTML = '<i class="fas fa-sync fa-spin"></i> Eşitleniyor...';
+        
+        try {
+            const doc = await db.collection("users").doc(uid).get();
+            if (doc.exists) {
+                const cloudData = doc.data();
+                if (cloudData.records && yakitVerileri.length === 0) {
+                    yakitVerileri = cloudData.records;
+                    localStorage.setItem('app_data_' + activeProfile, JSON.stringify(yakitVerileri));
+                }
+            }
+            // Yereldekileri buluta bas
+            await db.collection("users").doc(uid).set({ records: yakitVerileri }, { merge: true });
+            status.innerText = "Bulut Eşitlendi ✓";
+            ekraniGuncelle();
+        } catch (e) {
+            status.innerText = "Bağlantı Sorunu";
+        }
+    }
+
+    // --- APP LOGIC ---
+    function uygulamayiBaslat() {
+        yakitVerileri = JSON.parse(localStorage.getItem('app_data_' + activeProfile)) || [];
+        document.getElementById('tarih').valueAsDate = new Date();
+        
+        let rpmElement = document.getElementById("rpmValueVip");
+        let needle = document.getElementById("needle");
+        let start = null;
+
+        function step(timestamp) {
+            if (!start) start = timestamp;
+            let progress = timestamp - start;
+            let val = Math.min((progress / 2000) * 8000, 8000);
+            needle.style.transform = `rotate(${-135 + (val/8000)*270}deg)`;
+            rpmElement.innerText = Math.floor(val);
+            if (progress < 2000) window.requestAnimationFrame(step);
+            else {
+                document.getElementById('splashScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('mainApp').style.opacity = '1';
+                        ekraniGuncelle();
+                    }, 50);
+                }, 800);
+            }
+        }
+        window.requestAnimationFrame(step);
+    }
+
+    function veriEkle() {
+        let t = document.getElementById('tarih').value;
+        let i = document.getElementById('istasyon').value;
+        let k = parseFloat(document.getElementById('km').value);
+        let l = parseFloat(document.getElementById('litre').value);
+        let f = parseFloat(document.getElementById('fiyat').value);
+
+        if(!t || isNaN(k) || isNaN(l)) return alert("Eksik bilgi!");
+
+        let tutar = (l * f).toFixed(2);
+        let tuketim = "-";
+        if (yakitVerileri.length > 0) {
+            let fark = k - yakitVerileri[yakitVerileri.length - 1].km;
+            tuketim = ((l / fark) * 100).toFixed(2);
+        }
+
+        yakitVerileri.push({ id: Date.now(), tarih: t, istasyon: i, km: k, litre: l, tutar: tutar, tuketim: tuketim });
+        localStorage.setItem('app_data_' + activeProfile, JSON.stringify(yakitVerileri));
+        if (auth.currentUser) bulutVeriSenkronizeEt(auth.currentUser.uid);
+        ekraniGuncelle();
+        sekmeDegistir('dashboard', document.querySelectorAll('.nav-item')[0]);
+    }
+
+    function ekraniGuncelle() {
+        let tablo = document.getElementById('tabloGövdesi'); tablo.innerHTML = "";
+        let labels = []; let consumption = []; let totalCost = 0;
+        let stationCounts = {}; let monthlyStats = {};
+
+        yakitVerileri.slice().reverse().forEach(v => {
+            tablo.innerHTML += `<tr><td>${v.tarih}</td><td>${v.istasyon}</td><td>${v.km}</td><td class="money-blur">${v.tutar}₺</td><td><button class="del-btn" onclick="sil(${v.id})"><i class="fas fa-trash"></i></button></td></tr>`;
+        });
+
+        yakitVerileri.forEach((v, index) => {
+            totalCost += parseFloat(v.tutar);
+            stationCounts[v.istasyon] = (stationCounts[v.istasyon] || 0) + 1;
+            let month = v.tarih.substring(0, 7);
+            monthlyStats[month] = (monthlyStats[month] || 0) + parseFloat(v.tutar);
+            if(index > 0) {
+                labels.push(v.km);
+                consumption.push(parseFloat(v.tuketim));
+            }
+        });
+
+        document.getElementById('dashTotalCost').innerText = totalCost.toFixed(0) + " ₺";
+        if (yakitVerileri.length > 1) {
+            let yol = yakitVerileri[yakitVerileri.length-1].km - yakitVerileri[0].km;
+            let ort = (yakitVerileri.slice(1).reduce((a,b)=>a+parseFloat(b.litre),0) / yol) * 100;
+            document.getElementById('dashAvg').innerText = ort.toFixed(2) + " L";
+        }
+
+        // Grafik Çizimleri
+        grafikCiz(labels, consumption);
+        istasyonGrafikCiz(stationCounts);
+        aylikGrafikCiz(monthlyStats);
+    }
+
+    function grafikCiz(labels, data) {
+        let ctx = document.getElementById('yakitGrafigi').getContext('2d');
+        if(yakitGrafigi) yakitGrafigi.destroy();
+        yakitGrafigi = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: [{ data: data, borderColor: '#002c5f', fill: true, backgroundColor: 'rgba(0,44,95,0.1)', tension:0.4 }] },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+        });
+    }
+
+    function istasyonGrafikCiz(counts) {
+        let ctx = document.getElementById('istasyonGrafigi').getContext('2d');
+        if(istasyonGrafigi) istasyonGrafigi.destroy();
+        istasyonGrafigi = new Chart(ctx, {
+            type: 'doughnut',
+            data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#002c5f', '#e63946', '#2ecc71', '#f1c40f', '#9b59b6'] }] },
+            options: { responsive:true, maintainAspectRatio:false }
+        });
+    }
+
+    function aylikGrafikCiz(stats) {
+        let ctx = document.getElementById('aylikGrafik').getContext('2d');
+        if(aylikGrafigi) aylikGrafigi.destroy();
+        aylikGrafigi = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), backgroundColor: '#002c5f', borderRadius: 8 }] },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+        });
+    }
+
+    function sil(id) {
+        if(confirm("Kaydı sil?")) {
+            yakitVerileri = yakitVerileri.filter(v => v.id !== id);
+            localStorage.setItem('app_data_' + activeProfile, JSON.stringify(yakitVerileri));
+            if (auth.currentUser) bulutVeriSenkronizeEt(auth.currentUser.uid);
+            ekraniGuncelle();
+        }
+    }
+
+    function sekmeDegistir(sekme, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + sekme).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function temaSec(t) {
+        document.body.className = t === 'gece' ? 'theme-gece' : '';
+    }
+
+    function togglePrivacy() {
+        document.body.classList.toggle('privacy-mode');
+    }
+</script>
+</body>
+</html>
