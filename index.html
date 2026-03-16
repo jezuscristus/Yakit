@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakıt Takip Asistanı Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+        body.theme-nline {
+            --primary: #e63946; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%);
+            --glass-bg: rgba(30, 30, 30, 0.8); --glass-border: rgba(230, 57, 70, 0.3);
+            --text-main: #f1f1f1; --text-muted: #aaaaaa; --input-bg: rgba(15, 15, 15, 0.9);
+        }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html { background: var(--bg-grad); height: 100%; overflow: hidden; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); transition: all 0.5s ease; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* Glassmorphism Cards */
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; width: 100%; }
+        .card-title { font-size: 15px; margin-bottom: 15px; color: var(--primary); font-weight: 800; display: flex; align-items: center; gap: 8px; }
+        
+        /* Firebase Card */
+        .cloud-card { background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), var(--glass-bg)) !important; border: 1px solid rgba(66, 133, 244, 0.3) !important; }
+        .btn-google { background: #fff; color: #444; border: none; border-radius: 12px; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); font-size: 13px; margin-top: 10px; }
+        
+        /* Charts & Stats */
+        .chart-container { position: relative; height: 180px; width: 100%; margin-bottom: 10px; }
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); text-align: center; padding: 15px; border-radius: 20px; }
+        .stat-card i { font-size: 20px; color: var(--primary); margin-bottom: 5px; }
+        .stat-card h3 { font-size: 16px; font-weight: 800; }
+
+        /* Splash Screen */
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.8s ease; }
+        .rpm-gauge-vip { width: 300px; height: 300px; }
+        #needle { transform-origin: 150px 150px; transform: rotate(-135deg); transition: 0.1s linear; }
+
+        /* Profile & Header */
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-top: 10px; }
+        .profile-pic-large { width: 65px; height: 65px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .profile-pic-large i { font-size: 30px; color: var(--text-muted); }
+        
+        .main-content { display: block; flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 100px; }
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 80px; background: var(--glass-bg); backdrop-filter: blur(15px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; border-radius: 20px 20px 0 0; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; }
+
+        .money-blur { transition: 0.3s; }
+        body.privacy-mode .money-blur { filter: blur(6px); opacity: 0.6; }
+        
+        input, select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--input-bg); margin-bottom: 10px; }
+        .btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; }
+    </style>
+</head>
+<body onload="uygulamayiBaslat()">
+
+    <div id="splashScreen">
+        <svg class="rpm-gauge-vip" viewBox="0 0 300 300">
+            <path d="M 50 240 A 110 110 0 1 1 250 240" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round"/>
+            <path d="M 50 240 A 110 110 0 1 1 250 240" fill="none" stroke="#e63946" stroke-width="8" stroke-dasharray="520" stroke-dashoffset="520" id="gaugeProgress"/>
+            <g id="needle">
+                <polygon points="148,150 152,150 150,60" fill="#fff"/>
+                <circle cx="150" cy="150" r="12" fill="#002c5f" stroke="#fff" stroke-width="2"/>
+            </g>
+        </svg>
+        <h2 style="color:white; margin-top:20px; letter-spacing:3px;">YAKIT TAKİP PRO</h2>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none;">
+        <div class="header-top">
+            <div>
+                <p style="font-size: 12px; color: var(--text-muted);">Hoş Geldin,</p>
+                <h1 id="userNameDisplay" style="font-size: 20px; font-weight: 800;">Sürücü</h1>
+            </div>
+            <div class="profile-pic-large" id="profilePicBox">
+                <i class="fas fa-user" id="defaultUserIcon"></i>
+                <img id="userPhotoImg" src="" style="display:none; width:100%; height:100%; object-fit:cover;">
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="dashboard">
+                <div class="stat-card"><i class="fas fa-gas-pump"></i><p style="font-size:10px;">ORTALAMA</p><h3 id="dashAvg">- L</h3></div>
+                <div class="stat-card"><i class="fas fa-lira-sign"></i><p style="font-size:10px;">TOPLAM</p><h3 id="dashTotal" class="money-blur">0 ₺</h3></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-area"></i> Tüketim Trendi</h2>
+                <div class="chart-container"><canvas id="yakitGrafigi"></canvas></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-pie"></i> İstasyon Sadakati</h2>
+                <div class="chart-container"><canvas id="istasyonGrafigi"></canvas></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-bar"></i> Aylık Harcama</h2>
+                <div class="chart-container"><canvas id="aylikGrafik"></canvas></div>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-plus-circle"></i> Yeni Kayıt</h2>
+                <input type="date" id="tarih">
+                <select id="istasyon"><option>Shell</option><option>Opet</option><option>BP</option><option>Petrol Ofisi</option></select>
+                <input type="number" id="km" placeholder="Güncel KM">
+                <input type="number" id="litre" placeholder="Litre">
+                <input type="number" id="fiyat" placeholder="Litre Fiyatı">
+                <button class="btn" onclick="veriEkle()">KAYDET</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-list"></i> Kayıt Geçmişi</h2>
+                <div id="gecmisListe"></div>
+            </div>
+        </div>
+
+        <div id="tab-profile" class="tab-content">
+            <div class="card cloud-card">
+                <h2 class="card-title" style="color:#4285F4;"><i class="fas fa-cloud"></i> Bulut Yedekleme</h2>
+                <div id="authBox">
+                    <p style="font-size:11px; margin-bottom:10px;">Verilerini güvene almak için Google ile giriş yap.</p>
+                    <button class="btn-google" onclick="firebaseGiris()">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" width="18" alt="G"> Google ile Bağlan
+                    </button>
+                </div>
+                <div id="userBox" style="display:none; justify-content: space-between; align-items: center;">
+                    <span id="syncStatus" style="font-size:12px; color:#2ecc71; font-weight:800;">Bağlı ✓</span>
+                    <button onclick="firebaseCikis()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-weight:800;">Çıkış</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-palette"></i> Tema Seçimi</h2>
+                <button class="btn" onclick="temaSec('gece')" style="margin-bottom:10px;">Gece Modu</button>
+                <button class="btn" style="background:#eee; color:#333;" onclick="temaSec('standart')">Gündüz Modu</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="sekmeDegistir('dashboard', this)"><i class="fas fa-home"></i><span>Ana Sayfa</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('add', this)"><i class="fas fa-plus"></i><span>Ekle</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('history', this)"><i class="fas fa-history"></i><span>Geçmiş</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('profile', this)"><i class="fas fa-user-cog"></i><span>Ayarlar</span></div>
+    </div>
+
+    <script>
+        // --- FIREBASE KONFİGÜRASYONU ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAYJdXZLattRESMO-Udag_NV8KPtSexUiQ",
+            authDomain: "yakittakippro.firebaseapp.com",
+            projectId: "yakittakippro",
+            storageBucket: "yakittakippro.firebasestorage.app",
+            messagingSenderId: "73308208440",
+            appId: "1:73308208440:web:8d8a8bd8612a085eb615cd",
+            measurementId: "G-4MEL63NWM0"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let yakitVerileri = [];
+        let charts = {};
+
+        // --- AUTH & SYNC ---
+        function firebaseGiris() { const p = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(p); }
+        function firebaseCikis() { auth.signOut().then(() => location.reload()); }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('authBox').style.display = 'none';
+                document.getElementById('userBox').style.display = 'flex';
+                document.getElementById('userNameDisplay').innerText = user.displayName;
+                // Fotoğrafı göster
+                const img = document.getElementById('userPhotoImg');
+                img.src = user.photoURL;
+                img.style.display = 'block';
+                document.getElementById('defaultUserIcon').style.display = 'none';
+                bulutCek(user.uid);
+            }
+        });
+
+        async function bulutCek(uid) {
+            const doc = await db.collection("users").doc(uid).get();
+            if (doc.exists) {
+                yakitVerileri = doc.data().records || [];
+                ekraniGuncelle();
+            }
+        }
+
+        async function bulutYedekle() {
+            if (auth.currentUser) {
+                await db.collection("users").doc(auth.currentUser.uid).set({ records: yakitVerileri }, { merge: true });
+            }
+        }
+
+        // --- CORE LOGIC ---
+        function uygulamayiBaslat() {
+            document.getElementById('tarih').valueAsDate = new Date();
+            let start = null;
+            function step(timestamp) {
+                if (!start) start = timestamp;
+                let progress = timestamp - start;
+                let val = Math.min((progress / 1500) * 8000, 8000);
+                document.getElementById('needle').style.transform = `rotate(${-135 + (val/8000)*270}deg)`;
+                document.getElementById('gaugeProgress').style.strokeDashoffset = 520 - (val/8000)*520;
+                if (progress < 1500) window.requestAnimationFrame(step);
+                else {
+                    document.getElementById('splashScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splashScreen').style.display = 'none';
+                        document.getElementById('mainApp').style.display = 'block';
+                        document.getElementById('mainApp').style.opacity = '1';
+                        ekraniGuncelle();
+                    }, 800);
+                }
+            }
+            window.requestAnimationFrame(step);
+        }
+
+        function veriEkle() {
+            const k = document.getElementById('km').value;
+            const l = document.getElementById('litre').value;
+            const f = document.getElementById('fiyat').value;
+            if(!k || !l) return;
+            
+            yakitVerileri.push({
+                id: Date.now(),
+                tarih: document.getElementById('tarih').value,
+                istasyon: document.getElementById('istasyon').value,
+                km: parseFloat(k),
+                litre: parseFloat(l),
+                tutar: (parseFloat(l) * parseFloat(f)).toFixed(2)
+            });
+            bulutYedekle();
+            ekraniGuncelle();
+            sekmeDegistir('dashboard', document.querySelector('.nav-item'));
+        }
+
+        function ekraniGuncelle() {
+            let total = 0;
+            let istasyonlar = {};
+            let aylar = {};
+            const liste = document.getElementById('gecmisListe');
+            liste.innerHTML = "";
+
+            yakitVerileri.slice().reverse().forEach(v => {
+                total += parseFloat(v.tutar);
+                istasyonlar[v.istasyon] = (istasyonlar[v.istasyon] || 0) + 1;
+                let ay = v.tarih.substring(0, 7);
+                aylar[ay] = (aylar[ay] || 0) + parseFloat(v.tutar);
+                
+                liste.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--glass-border); font-size:12px;">
+                        <span><b>${v.tarih}</b><br>${v.istasyon}</span>
+                        <span style="text-align:right"><b>${v.tutar} ₺</b><br>${v.km} KM</span>
+                    </div>`;
+            });
+
+            document.getElementById('dashTotal').innerText = total.toFixed(0) + " ₺";
+            grafikleriCiz(istasyonlar, aylar);
+        }
+
+        function grafikleriCiz(istData, ayData) {
+            const c = (id) => document.getElementById(id).getContext('2d');
+            
+            // 1. Tüketim Trendi (Line)
+            if(charts.line) charts.line.destroy();
+            charts.line = new Chart(c('yakitGrafigi'), {
+                type: 'line',
+                data: {
+                    labels: yakitVerileri.map(v => v.tarih),
+                    datasets: [{ data: yakitVerileri.map(v => v.km), borderColor: '#002c5f', tension: 0.4, fill:true, backgroundColor:'rgba(0,44,95,0.05)' }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { display: false } } }
+            });
+
+            // 2. İstasyon Sadakati (Donut)
+            if(charts.donut) charts.donut.destroy();
+            charts.donut = new Chart(c('istasyonGrafigi'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(istData),
+                    datasets: [{ data: Object.values(istData), backgroundColor: ['#002c5f', '#e63946', '#2ecc71', '#f1c40f'] }]
+                },
+                options: { plugins: { legend: { position: 'bottom', labels:{boxWidth:12, font:{size:10}} } } }
+            });
+
+            // 3. Aylık Bütçe (Bar)
+            if(charts.bar) charts.bar.destroy();
+            charts.bar = new Chart(c('aylikGrafik'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(ayData),
+                    datasets: [{ label: 'Harcama', data: Object.values(ayData), backgroundColor: '#002c5f', borderRadius:5 }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function sekmeDegistir(s, el) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + s).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function temaSec(t) {
+            document.body.className = t === 'gece' ? 'theme-gece' : '';
+        }
+
+        function togglePrivacy() { document.body.classList.toggle('privacy-mode'); }
+    </script>
+</body>
+</html>
