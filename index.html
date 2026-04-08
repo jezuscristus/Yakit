@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakıt Takip Asistanı Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#002c5f">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Yakıt Takip">
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+            --tilt-x: 0deg; --tilt-y: 0deg;
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+        body.theme-nline {
+            --primary: #e63946; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%);
+            --glass-bg: rgba(30, 30, 30, 0.8); --glass-border: rgba(230, 57, 70, 0.3);
+            --text-main: #f1f1f1; --text-muted: #aaaaaa; --input-bg: rgba(15, 15, 15, 0.9);
+        }
+        body.theme-elite {
+            --primary: #b0bec5; --accent: #ffffff;
+            --bg-grad: linear-gradient(135deg, #263238 0%, #101418 100%);
+            --glass-bg: rgba(40, 50, 56, 0.7); --glass-border: rgba(176, 190, 197, 0.2);
+            --text-main: #eceff1; --text-muted: #90a4ae; --input-bg: rgba(20, 26, 30, 0.8);
+        }
+        body.theme-eco {
+            --primary: #2ecc71; --accent: #f1c40f;
+            --bg-grad: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            --glass-bg: rgba(20, 35, 30, 0.7); --glass-border: rgba(46, 204, 113, 0.2);
+            --text-main: #ffffff; --text-muted: #a3c2b1; --input-bg: rgba(10, 20, 15, 0.8);
+        }
+
+        .cloud-card { background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), var(--glass-bg)) !important; border: 1px solid rgba(66, 133, 244, 0.3) !important; }
+        .btn-google { background: #fff; color: #444; border: none; border-radius: 12px; padding: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: 0.2s; font-size: 13px; margin-top: 10px; }
+        .btn-google:active { transform: scale(0.96); }
+        .user-sync-info { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .user-meta { display: flex; align-items: center; gap: 10px; }
+        .user-meta img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--primary); }
+        .sync-text { font-size: 10px; font-weight: 800; display: block; margin-top: 2px; }
+        .sync-success { color: #2ecc71; }
+        .sync-loading { color: var(--primary); animation: pulse 1s infinite alternate; }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html { background: var(--bg-grad); height: 100%; overflow: hidden; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); transition: all 0.5s ease; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; perspective: 1000px; }
+        
+        body.privacy-mode .money-blur { filter: blur(6px); opacity: 0.6; pointer-events: none; user-select: none; transition: 0.3s ease; }
+
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: all 0.8s ease-in-out; }
+        .rpm-container-vip { position: relative; width: 320px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; margin-top: -60px; transition: opacity 0.4s ease, transform 0.4s ease; }
+        .rpm-gauge-vip { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: visible; }
+        .gauge-bar-vip { stroke-width: 12; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: 520; animation: revUpVIP 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        #needle { transform-origin: 160px 160px; transform: rotate(-135deg); transition: transform 0.05s linear; }
+        .rpm-text-vip { position: absolute; top: 190px; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+        #rpmValueVip { font-size: 55px; font-weight: 800; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); line-height: 1; }
+        .rpm-text-vip small { font-size: 14px; color: #e74c3c; font-weight: 800; letter-spacing: 4px; margin-top: 5px; }
+
+        @keyframes revUpVIP { 0% { stroke-dashoffset: 520; filter: drop-shadow(0 0 10px rgba(46,204,113,0.8)); } 100% { stroke-dashoffset: 0; filter: drop-shadow(0 0 15px rgba(231,76,60,0.9)); } }
+
+        .splash-title-container-vip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; width: 100%; z-index: 2; pointer-events: none; }
+        .splash-title-liquid-neon { font-size: 34px; font-weight: 800; letter-spacing: 5px; margin: 0; opacity: 0; text-align: center; line-height: 1.4; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.15); background: linear-gradient(90deg, var(--primary), var(--accent), #ffffff, var(--primary)); background-size: 300% 100%; -webkit-background-clip: text; filter: drop-shadow(0 0 15px var(--primary)); transform: scale(0.9); }
+        .neon-slide { opacity: 1; transform: scale(1); transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1); animation: liquidFlow 3s linear infinite; }
+        @keyframes liquidFlow { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+        .main-content { display: block; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; padding-bottom: calc(95px + env(safe-area-inset-bottom)); width: 100%; }
+        .tab-content { display: none; width: 100%; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .parallax-target { transform: rotateX(var(--tilt-y)) rotateY(var(--tilt-x)); transition: transform 0.1s ease-out; }
+        
+        .top-bar-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; width: 100%; position: relative; height: 30px;}
+        .app-top-brand { font-size: 15px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.05); margin: 0; white-space: nowrap;}
+        
+        .privacy-btn { background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-main); padding: 5px 12px; border-radius: 12px; font-size: 14px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; z-index: 10;}
+        .privacy-btn:active { transform: scale(0.9); }
+        .pulse-icon { color: #2ecc71; margin-right: 5px; animation: pulseOp 1.5s infinite; }
+        @keyframes pulseOp { 0% { opacity: 0.4; } 50% { opacity: 1; filter: drop-shadow(0 0 5px #2ecc71);} 100% { opacity: 0.4; } }
+
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
+        .greeting-box { display: flex; flex-direction: column; flex: 1;}
+        .greeting-box p { font-size: 14px; color: var(--text-muted); margin: 0; font-weight: 600;}
+        .greeting-box h1 { font-size: 22px; font-weight: 800; margin: 0; color: var(--text-main); display: flex; align-items: center; flex-wrap: wrap; gap: 8px;}
+        .plaka-badge { font-size: 11px; background: var(--primary); color: #fff; padding: 3px 8px; border-radius: 6px; letter-spacing: 1px; white-space: nowrap; }
+        
+        .profile-pic-container { position: relative; cursor: pointer; transition: 0.3s; margin-left: 10px; }
+        .profile-pic-container:active { transform: scale(0.95); }
+        .profile-pic-large { width: 75px; height: 75px; min-width: 75px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover; box-shadow: 0 6px 18px rgba(0,0,0,0.2); background: white;}
+        .vehicle-badge { position: absolute; bottom: -5px; right: -5px; background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--glass-bg); font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(75px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--glass-bg); backdrop-filter: blur(15px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; width: 25%; }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; transition: 0.3s; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item.active i { transform: translateY(-4px) scale(1.1); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; overflow: hidden; width: 100%;}
+        .card-title { font-size: 16px; margin-bottom: 15px; padding-bottom: 5px; color: var(--primary); font-weight: 800; display: flex; align-items: center; gap: 8px; border: none; letter-spacing: 0.5px;}
+
+        .top-action-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn-action-top { flex: 1; padding: 12px 5px; color: white; border: none; border-radius: 15px; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); transition: 0.2s; letter-spacing: 0.5px; text-align: center; }
+        .btn-action-top:active { transform: scale(0.95); }
+        .bg-trip { background: linear-gradient(135deg, var(--primary), var(--accent)); }
+
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; width: 100%;}
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); text-align: center; padding: 15px; border-radius: 20px; display: flex; flex-direction: column; justify-content: center; transition: 0.3s; }
+        .stat-card i { font-size: 22px; color: var(--primary); margin-bottom: 8px; }
+        .stat-card p { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 5px; text-transform: uppercase;}
+        .stat-card h3 { font-size: 18px; color: var(--text-main); font-weight: 800; }
+        .stat-card span { display: block; font-size: 8px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; margin-top: 2px; }
+        
+        .chart-container { position: relative; height: 200px; width: 100%; }
+        .chart-container-donut { position: relative; height: 220px; width: 100%; display: flex; justify-content: center;}
+
+        .input-group { margin-bottom: 12px; width: 100%; box-sizing: border-box; overflow: hidden; }
+        .input-group label { font-size: 12px; margin-bottom: 5px; color: var(--text-muted); font-weight: 600; display: block; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid var(--glass-border); border-radius: 12px; font-size: 14px; outline: none; background: var(--input-bg); color: var(--text-main); box-sizing: border-box; max-width: 100%; -webkit-appearance: none; appearance: none;}
+        
+        input[type="date"] { display: block; width: 100% !important; max-width: 100% !important; -webkit-box-sizing: border-box !important; box-sizing: border-box !important; margin: 0; font-family: inherit; }
+        
+        .istasyon-wrapper { display: flex; gap: 10px; width: 100%;}
+        .istasyon-wrapper select { flex: 1; box-sizing: border-box;}
+        .btn-icon-only { background: var(--primary); color: white; border: none; border-radius: 12px; width: 48px; min-width: 48px; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .btn-icon-only:active { transform: scale(0.9); }
+        .btn-icon-only:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .smart-actions { display: flex; gap: 10px; margin-bottom: 15px; width: 100%;}
+        .btn-smart { flex: 1; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none; border-radius: 12px; padding: 12px 5px; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: 0.2s; white-space: nowrap;}
+        .btn-smart:active { transform: scale(0.95); }
+
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; transition: 0.2s;}
+        .btn:active { transform: scale(0.97); }
+        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+        .btn-black { background: #111111; color: #ffffff; border: 1px solid #333; }
+
+        .theme-selector { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px; }
+        .theme-btn { padding: 6px 12px; border-radius: 15px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-main); font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s;}
+        .theme-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .auto-theme-btn { width: 100%; background: linear-gradient(135deg, #2c3e50, #3498db); color: white; border-radius: 12px; padding: 10px; font-size: 12px; border: none; font-weight: 800; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); margin-bottom: 10px; transition: 0.3s;}
+        .auto-theme-btn.active { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 4px 15px rgba(46,204,113,0.4);}
+
+        .visual-garage { position: relative; width: 100%; height: 280px; background: rgba(0,0,0,0.05); border: 1px solid var(--glass-border); border-radius: 20px; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.05);}
+        .car-top-view { position: relative; width: 100px; height: 220px; background: linear-gradient(to bottom, var(--primary) 0%, #1a1a1a 100%); border-radius: 30px; border: 2px solid var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 2;}
+        .car-top-view::before { content: ''; position: absolute; top: 15%; left: 10%; width: 80%; height: 25%; background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .car-top-view::after { content: ''; position: absolute; bottom: 10%; left: 15%; width: 70%; height: 15%; background: rgba(255,255,255,0.1); border-radius: 8px; }
+        .tire { position: absolute; width: 20px; height: 45px; background: #222; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); z-index: 1;}
+        .tire-fl { top: 25px; left: -10px; } .tire-fr { top: 25px; right: -10px; }
+        .tire-rl { bottom: 25px; left: -10px; } .tire-rr { bottom: 25px; right: -10px; }
+        
+        .moto-top-view { position: relative; width: 50px; height: 200px; background: linear-gradient(to bottom, #4facfe 0%, #111 100%); border-radius: 15px; border: 2px solid var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 10px 0;}
+        .moto-top-view::before { content: ''; position: absolute; top: 40%; left: 10%; width: 80%; height: 30%; background: rgba(255,255,255,0.1); border-radius: 5px; }
+        .tire-m-front { position: relative; width: 14px; height: 40px; background: #222; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); z-index: 1; margin-top: -20px;}
+        .tire-m-rear { position: relative; width: 18px; height: 45px; background: #222; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); z-index: 1; margin-bottom: -25px;}
+
+        .psi-badge { position: absolute; background: var(--glass-bg); backdrop-filter: blur(5px); color: var(--text-main); font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--glass-border); white-space: nowrap; z-index: 3;}
+        .psi-fl { top: 20px; left: -60px; } .psi-fr { top: 20px; right: -60px; }
+        .psi-rl { bottom: 20px; left: -60px; } .psi-rr { bottom: 20px; right: -60px; }
+        .psi-m-f { top: -15px; left: -50px; } .psi-m-r { bottom: -15px; left: -50px; }
+
+        #ocrOverlay, #cropperModal, #voiceOverlay, .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px;}
+        .cropper-container-inner { width: 100%; flex: 1; display: flex; align-items: center; justify-content: center; border: 1px solid var(--glass-border); border-radius: 20px; overflow: hidden; background: var(--glass-bg);}
+        .cropper-modal-img { max-width: 100%; max-height: 100%;}
+        .cropper-modal-actions { display: flex; gap: 10px; width: 100%; margin-top: 15px;}
+
+        .modal-box { background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 25px; border-radius: 20px; width: 85%; text-align: center; transform: scale(0.9); transition: transform 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-box h3 { color: var(--text-main); font-size: 18px; margin-bottom: 10px; font-weight: 800; }
+        .modal-box p { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; font-weight: 600; }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: 0.2s; }
+        .modal-btn-yes { background: #e63946; color: white; }
+        .modal-btn-no { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--glass-border); }
+
+        .profile-upload-area { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
+        .profile-upload-circle-wrapper { position: relative; width: 100px; height: 100px;}
+        .profile-upload-circle { width: 100%; height: 100%; border-radius: 50%; border: 3px dashed var(--primary); display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--input-bg); cursor: pointer;}
+        .profile-upload-circle img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-upload-circle i { font-size: 30px; color: var(--text-muted); }
+        .profile-edit-badge { position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; border: 3px solid var(--glass-bg); font-size: 14px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);}
+        #fileInput, #ocrInput { display: none; }
+        
+        .table-responsive { overflow-x: auto; width: 100%;}
+        table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; color: var(--text-main); }
+        th, td { padding: 10px 5px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+        th { font-weight: 600; color: var(--primary); }
+        .del-btn { color: var(--accent); background: none; border: none; font-size: 14px; cursor: pointer; }
+
+        /* Yeni: Depo Dolu Switch stili */
+        .switch-group { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.05); padding: 12px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--glass-border); }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2ecc71; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .partial-row { opacity: 0.6; background: rgba(0,0,0,0.02); }
+
+        #pdfTemplateWrapper { position: absolute; top: 0; left: -9999px; z-index: -100; pointer-events: none; opacity: 0.01; }
+        
+        #pdfResultModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 25000; display: none; align-items: center; justify-content: center; opacity: 0; transition: 0.3s; flex-direction: column; padding: 20px;}
+        .pdf-result-box { background: var(--glass-bg); padding: 30px; border-radius: 20px; text-align: center; max-width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid var(--glass-border); }
+
+        #pdfTemplate { width: 800px; padding: 40px; background: white; color: black; font-family: 'Helvetica', Arial, sans-serif; box-sizing: border-box;}
+        .pdf-header { text-align: center; border-bottom: 2px solid #002c5f; padding-bottom: 20px; margin-bottom: 30px; }
+        .pdf-header h1 { color: #002c5f; margin: 0 0 10px 0; font-size: 28px; }
+        .pdf-header p { margin: 0; color: #555; font-size: 14px; }
+        .pdf-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .pdf-stat-box { background: #f5f5f5; padding: 20px; border-radius: 10px; width: 48%; text-align: center; border: 1px solid #ddd; }
+        .pdf-stat-box h3 { margin: 0 0 10px 0; font-size: 14px; color: #555; text-transform: uppercase; }
+        .pdf-stat-box p { margin: 0; font-size: 24px; font-weight: bold; color: #002c5f; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .pdf-table th, .pdf-table td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; color: #000000 !important; }
+        .pdf-table th { background: #002c5f; color: white !important; font-weight: bold; }
+        
+        .ocr-scanner { width: 200px; height: 250px; border: 2px dashed #4facfe; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;}
+        .ocr-laser { position: absolute; width: 100%; height: 4px; background: #4facfe; box-shadow: 0 0 15px #4facfe; animation: scanAnim 2s infinite alternate; }
+        #ocrImgPreview { width: 100%; height: 100%; object-fit: contain; opacity: 0.8;}
+        .ocr-text { color: #fff; margin-top: 15px; font-size: 12px; font-weight: 600; letter-spacing: 1px; animation: pulse 1s infinite alternate; text-align: center; padding: 0 10px;}
+        
+        .voice-circle { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, #4facfe, #00f2fe); display: flex; align-items: center; justify-content: center; font-size: 40px; color: white; box-shadow: 0 0 30px rgba(79, 172, 254, 0.8); animation: ripple 1.5s infinite; margin-bottom: 20px;}
+        .voice-text { color: white; font-size: 16px; font-weight: 600; text-align: center;}
+        @keyframes ripple { 0% { box-shadow: 0 0 0 0 rgba(79, 172, 254, 0.6); } 100% { box-shadow: 0 0 0 40px rgba(79, 172, 254, 0); } }
+        @keyframes scanAnim { 0% { top: 0; } 100% { top: 100%; } }
+        @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+        #tripModal { position: fixed; bottom: -100%; left: 0; width: 100%; background: var(--glass-bg); backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); border-top-left-radius: 25px; border-top-right-radius: 25px; padding: 25px; z-index: 10005; transition: 0.4s ease-in-out; box-shadow: 0 -10px 30px rgba(0,0,0,0.2); }
+        #tripModal.open { bottom: 0; }
+        .trip-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; color: var(--text-main); font-weight: 800; font-size: 18px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;}
+        .trip-result { background: rgba(0,0,0,0.05); padding: 15px; border-radius: 12px; text-align: center; margin-top: 15px; display: none; border: 1px solid var(--glass-border);}
+        .trip-result h3 { color: var(--primary); font-size: 22px; margin-bottom: 5px;}
+        .trip-result p { font-size: 12px; color: var(--text-muted); font-weight: 600;}
+    </style>
+</head>
+<body onload="uygulamayiBaslat()">
+    <script>
+        let isAutoTheme = localStorage.getItem('i20_auto_theme') !== 'false'; 
+        let currentTheme = localStorage.getItem('i20_tema') || 'standart';
+        if(isAutoTheme) {
+            let h = new Date().getHours();
+            currentTheme = (h >= 19 || h < 7) ? 'gece' : 'standart';
+        }
+        if(currentTheme !== 'standart') document.body.classList.add('theme-' + currentTheme);
+        if(localStorage.getItem('privacy_mode') === 'true') document.body.classList.add('privacy-mode');
+    </script>
+
+    <div id="splashScreen">
+        <div class="rpm-container-vip">
+            <svg class="rpm-gauge-vip" viewBox="0 0 320 320">
+                <defs>
+                    <linearGradient id="multiColorGradient" x1="0%" y1="100%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#2ecc71" /><stop offset="50%" stop-color="#4facfe" /><stop offset="100%" stop-color="#e74c3c" />
+                    </linearGradient>
+                </defs>
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round"/>
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="12" stroke-dasharray="2 13" />
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="#fff" stroke-width="22" stroke-dasharray="4 44.1" />
+                <path class="gauge-bar-vip" d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="url(#multiColorGradient)" />
+                <g id="needle">
+                    <polygon points="157,160 163,160 160,55" fill="#fff" filter="drop-shadow(0 0 5px rgba(255,255,255,0.5))"/>
+                    <circle cx="160" cy="160" r="16" fill="#050505" stroke="#333" stroke-width="4"/>
+                    <circle cx="160" cy="160" r="6" fill="#4facfe"/>
+                </g>
+            </svg>
+            <div class="rpm-text-vip"><span id="rpmValueVip">0</span> <small>RPM</small></div>
+        </div>
+        <div class="splash-title-container-vip">
+            <h1 class="splash-title-liquid-neon">YAKIT TAKİP<br>ASİSTANI</h1>
+        </div>
+    </div>
+
+    <div id="tripModal">
+        <div class="trip-header">
+            <span><i class="fas fa-map-marked-alt"></i> Akıllı Yolculuk</span>
+            <i class="fas fa-times" onclick="kapatTripModal()" style="cursor: pointer; color: var(--accent);"></i>
+        </div>
+        
+        <div class="input-group">
+            <label>Hedef Mesafe Girin (KM)</label>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="tripKm" min="1" placeholder="Örn: 450" oninput="temizleTrip('tl')">
+                <button class="btn" style="width:auto; margin-top:0;" onclick="hesaplaTrip('km')"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+        
+        <div style="text-align:center; font-size:11px; font-weight:800; color:var(--text-muted); margin: 10px 0;">VEYA</div>
+        
+        <div class="input-group">
+            <label>Hedef Bütçe Girin (₺)</label>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="tripBudget" min="1" placeholder="Örn: 1500" oninput="temizleTrip('km')">
+                <button class="btn" style="width:auto; margin-top:0; background:var(--accent);" onclick="hesaplaTrip('tl')"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+
+        <div class="trip-result" id="tripResultBox">
+            <h3 id="tripResPrimary" class="money-val" style="font-size: 26px;">-</h3>
+            <p id="tripResSecondary" style="font-size: 13px; font-weight: 800;">-</p>
+            <p style="font-size: 10px; margin-top: 8px;">* Aracınızın son ortalaması baz alınmıştır.</p>
+        </div>
+    </div>
+
+    <div id="cropperModal">
+        <h3 class="card-title" style="color:white; margin-bottom:10px;"><i class="fas fa-crop"></i> Fotoğrafı Kes</h3>
+        <div class="cropper-container-inner"><img src="" id="cropperImagePreview" class="cropper-modal-img"></div>
+        <div class="cropper-modal-actions">
+            <button class="btn btn-outline" onclick="closeCropper()"><i class="fas fa-times"></i> Vazgeç</button>
+            <button class="btn" onclick="performCrop()"><i class="fas fa-check"></i> Kes ve Kaydet</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="customConfirmModal">
+        <div class="modal-box" id="modalBox">
+            <h3>Tüm Verileri Sıfırla</h3>
+            <p>Sadece bu araca ait verileri silmek istediğinizden emin misiniz?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" onclick="verileriOnaylaSil(); titret(30);">Evet</button>
+                <button class="modal-btn modal-btn-no" onclick="modalKapat(); titret(15);">Hayır</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none; opacity:0; transition: 0.8s ease;">
+        
+        <div class="top-bar-container">
+            <div class="app-top-brand parallax-target"><i class="fas fa-gas-pump"></i> Yakıt Takip Asistanı</div>
+            <div style="display: flex; gap: 8px; z-index: 10;">
+                <div class="privacy-btn" onclick="acTripModal()" title="Maliyet Hesapla" style="color: var(--primary);"><i class="fas fa-map-marked-alt"></i></div>
+                <div class="privacy-btn" onclick="togglePrivacy()" title="Gizlilik Modu"><i class="fas fa-eye-slash" id="privacyIcon"></i></div>
+            </div>
+        </div>
+
+        <div class="header-top parallax-target">
+            <div class="greeting-box">
+                <p id="tarihGosterge">İyi Sürüşler,</p>
+                <h1 id="kullaniciGosterge">Sürücü <span id="plakaGosterge" class="plaka-badge" style="display:none;"></span></h1>
+            </div>
+            <div class="profile-pic-container" onclick="switchVehicleProfile()">
+                <img src="" alt="Profil" class="profile-pic-large" id="headerProfilePic">
+                <div class="vehicle-badge" id="vehicleBadge"><i class="fas fa-car"></i></div>
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div id="bakimUyarisi"></div>
+
+            <div class="dashboard">
+                <div class="stat-card"><i class="fas fa-tint"></i><p>Ortalama</p><h3 id="dashAvg">- L</h3></div>
+                <div class="stat-card"><i class="fas fa-road"></i><p>Menzil</p><h3 id="dashRange">- KM</h3></div>
+                
+                <div class="stat-card"><i class="fas fa-leaf"></i><p>CO2 Salınımı</p><h3 id="dashCO2">0 KG</h3></div>
+                <div class="stat-card">
+                    <i class="fas fa-tachometer-alt"></i><p>Verimlilik</p>
+                    <h3 id="scoreBadge" style="color:var(--text-muted);">-</h3>
+                    <span id="scoreText">En az 2 kayıt</span>
+                </div>
+
+                <div class="stat-card"><i class="fas fa-wallet"></i><p>Harcama</p><h3 id="dashTotalCost" class="money-val money-blur">0 ₺</h3></div>
+                <div class="stat-card"><i class="fas fa-coins"></i><p>TL / KM</p><h3 id="dashCostPerKm" class="money-val money-blur">- ₺</h3></div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-line"></i> Tüketim Trendi</h2>
+                <div class="chart-container"><canvas id="yakitGrafigi"></canvas></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-gas-pump"></i> İstasyon Sadakati</h2>
+                <div class="chart-container-donut"><canvas id="istasyonGrafigi"></canvas></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-bar"></i> Aylık Bütçe</h2>
+                <div class="chart-container"><canvas id="aylikGrafik"></canvas></div>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="smart-actions">
+                <button class="btn-smart" onclick="document.getElementById('ocrInput').click(); titret(15);">
+                    <i class="fas fa-camera"></i><span>Yapay Zeka ile Tara</span>
+                </button>
+                <input type="file" id="ocrInput" accept="image/*" capture="environment" onchange="fisTaraAI(event)">
+                <button class="btn-smart" onclick="sesliAsistanBaslat(); titret(15);">
+                    <i class="fas fa-microphone"></i><span>Sesle Ekle</span>
+                </button>
+            </div>
+
+            <div class="card" id="fisKarti">
+                <div id="ocrOverlay" style="position: absolute; border-radius: 20px;">
+                    <div class="ocr-scanner"><img id="ocrImgPreview" src="" alt="Fiş"><div class="ocr-laser"></div></div>
+                    <p class="ocr-text" id="ocrLoadingText">Fiş Verileri Analiz Ediliyor...</p>
+                </div>
+                <div id="voiceOverlay" style="position: absolute; border-radius: 20px;">
+                    <div class="voice-circle"><i class="fas fa-microphone"></i></div>
+                    <p class="voice-text">Sizi dinliyorum...</p>
+                </div>
+
+                <h2 class="card-title"><i class="fas fa-plus-circle"></i> Yakıt Bilgileri</h2>
+                <div class="input-group"><label>Tarih</label><input type="date" id="tarih" required></div>
+                <div class="input-group">
+                    <label>İstasyon Markası</label>
+                    <div class="istasyon-wrapper">
+                        <select id="istasyon">
+                            <option value="Shell">Shell</option><option value="Opet">Opet</option><option value="BP">BP</option>
+                            <option value="Petrol Ofisi">Petrol Ofisi</option><option value="Total">Total</option><option value="Diğer">Diğer</option>
+                        </select>
+                        <button type="button" class="btn-icon-only" id="gpsBtn" onclick="gpsIleBul()" title="En Yakın İstasyonu Bul"><i class="fas fa-map-marker-alt"></i></button>
+                    </div>
+                </div>
+                <div class="input-group"><label>Güncel KM</label><input type="number" id="km" min="1" max="9999999" placeholder="Örn: 15200" required></div>
+                <div class="input-group"><label>Alınan Litre</label><input type="number" step="0.01" min="0.1" max="9999" id="litre" placeholder="Örn: 35.5" required></div>
+                <div class="input-group"><label>Litre Fiyatı (₺)</label><input type="number" step="0.01" min="0.1" max="999" id="fiyat" placeholder="Örn: 43.50" required></div>
+                
+                <div class="switch-group">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">Depoyu Fulledim</span>
+                    <label class="switch">
+                        <input type="checkbox" id="depoFull" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <button class="btn" onclick="veriEkle()"><i class="fas fa-save"></i> Kaydet ve Analiz Et</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title" style="justify-content: space-between;">
+                    <span><i class="fas fa-history"></i> Tüm Kayıtlar</span>
+                    <button onclick="generatePDF()" style="background:var(--primary); color:white; border:none; padding:5px 10px; border-radius:8px; font-size:11px; cursor:pointer;"><i class="fas fa-file-pdf"></i> PDF Rapor</button>
+                </h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Tarih</th><th>İstasyon</th><th>KM</th><th>Birim F.</th><th>Tutar</th><th>Ort.</th><th>Sil</th></tr></thead>
+                        <tbody id="tabloGövdesi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-profile" class="tab-content">
+            <div class="card cloud-card">
+                <h2 class="card-title" style="color: #4285F4;"><i class="fas fa-cloud-upload-alt"></i> Bulut Senkronizasyonu</h2>
+                
+                <div id="loggedOutUI">
+                    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Verilerinizi senkronize ederek asla kaybetmeyin.</p>
+                    <button class="btn-google" onclick="firebaseGirisYap()">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" width="18" alt="G">
+                        Google ile Giriş Yap
+                    </button>
+                </div>
+
+                <div id="loggedInUI" style="display: none;">
+                    <div class="user-sync-info">
+                        <div class="user-meta">
+                            <img id="userPhoto" src="" alt="Profil">
+                            <div>
+                                <h4 id="userName" style="font-size: 13px; margin: 0; color: var(--text-main);">Sürücü</h4>
+                                <span class="sync-text" id="syncStatus">Bulut Eşitlendi ✓</span>
+                            </div>
+                        </div>
+                        <button onclick="firebaseCikisYap()" style="background:none; border:none; color:var(--accent); font-weight:800; font-size:12px; cursor:pointer;">Çıkış Yap</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-palette"></i> Arayüz Teması</h2>
+                <button class="auto-theme-btn" id="btn-auto-theme" onclick="toggleAutoTheme()"><i class="fas fa-magic"></i> Otomatik</button>
+                <div class="theme-selector">
+                    <button class="theme-btn" onclick="temaSec('elite')" id="btn-elite">Gümüş Elit</button>
+                    <button class="theme-btn" onclick="temaSec('nline')" id="btn-nline">N-Line</button>
+                    <button class="theme-btn" onclick="temaSec('standart')" id="btn-standart">Gündüz</button>
+                    <button class="theme-btn" onclick="temaSec('gece')" id="btn-gece">Gece</button>
+                    <button class="theme-btn" onclick="temaSec('eco')" id="btn-eco">Eco Hybrid</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-user"></i> Sürücü Profili</h2>
+                <div class="profile-upload-area">
+                    <div class="profile-upload-circle-wrapper" onclick="document.getElementById('fileInput').click(); titret(10);">
+                        <div class="profile-upload-circle">
+                            <i class="fas fa-camera" id="camIcon"></i>
+                            <img id="profilePreview" src="" style="display:none;">
+                        </div>
+                        <div class="profile-edit-badge"><i class="fas fa-crop-alt"></i></div>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*" onchange="profilFotografiYukle(event)">
+                    <p style="font-size: 10px; color: var(--text-muted); margin-top: 5px;">Kırpmak ve değiştirmek için dokun</p>
+                </div>
+                <div class="input-group"><label>Ad Soyad</label><input type="text" id="adSoyad" placeholder="Örn: Ahmet Yılmaz"></div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-car"></i> Garaj Ayarları</h2>
+                
+                <div class="input-group">
+                    <label>Araç Türü</label>
+                    <select id="aracTuru" onchange="aracTuruDegisti()">
+                        <option value="Otomobil">Otomobil</option>
+                        <option value="Motosiklet">Motosiklet</option>
+                    </select>
+                </div>
+
+                <div class="input-group"><label>Plaka</label><input type="text" id="plakaNo" maxlength="15" placeholder="Örn: 34 ABC 123" style="text-transform: uppercase;"></div>
+                <div class="input-group"><label>Depo Hacmi (Litre)</label><input type="number" id="depoHacmi" min="1" max="999" placeholder="Örn: 50"></div>
+                
+                <div class="visual-garage" id="garageView">
+                    <div class="car-top-view" id="carView">
+                        <div class="tire tire-fl"></div><div class="psi-badge psi-fl"><span id="vg-fl">32</span> PSI</div>
+                        <div class="tire tire-fr"></div><div class="psi-badge psi-fr"><span id="vg-fr">32</span> PSI</div>
+                        <div class="tire tire-rl"></div><div class="psi-badge psi-rl"><span id="vg-rl">30</span> PSI</div>
+                        <div class="tire tire-rr"></div><div class="psi-badge psi-rr"><span id="vg-rr">30</span> PSI</div>
+                    </div>
+                    <div class="moto-top-view" id="motoView" style="display:none;">
+                        <div class="tire-m-front"></div><div class="psi-badge psi-m-f"><span id="vg-m-f">32</span> PSI</div>
+                        <div class="tire-m-rear"></div><div class="psi-badge psi-m-r"><span id="vg-m-r">34</span> PSI</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap:10px;">
+                    <div class="input-group" style="flex:1;"><label>Ön Lastik (PSI)</label><input type="number" id="onLastik" placeholder="Örn: 32"></div>
+                    <div class="input-group" style="flex:1;"><label>Arka Lastik (PSI)</label><input type="number" id="arkaLastik" placeholder="Örn: 30"></div>
+                </div>
+                <div class="input-group">
+                    <label>Yakıt Tipi</label>
+                    <select id="yakitTipi"><option value="Benzin">Benzin</option><option value="Dizel">Dizel</option><option value="LPG">LPG</option></select>
+                </div>
+                <div class="input-group"><label>Bir Sonraki Periyodik Bakım KM'si</label><input type="number" id="bakimKM" placeholder="Örn: 30000"></div>
+                <div class="input-group"><label>Muayene / Sigorta Bitiş Tarihi</label><input type="date" id="muayeneTarih"></div>
+                <button class="btn" onclick="profilKaydet()"><i class="fas fa-check-circle"></i> Ayarları Kaydet</button>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-cloud-download-alt"></i> Veri Güvenliği</h2>
+                <button class="btn btn-outline" onclick="excelIndir()"><i class="fas fa-file-excel"></i> Geçmişi İndir (CSV)</button>
+                <button class="btn btn-black" onclick="modalAc(); titret(15);" style="margin-top: 15px;"><i class="fas fa-trash-alt"></i> Verileri Sıfırla</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pdfTemplateWrapper">
+        <div id="pdfTemplate">
+            <div class="pdf-header">
+                <h1>Yakıt Takip Raporu</h1>
+                <p id="pdfDate"></p>
+            </div>
+            <div class="pdf-grid">
+                <div class="pdf-stat-box">
+                    <h3>Toplam Harcama</h3>
+                    <p id="pdfTotalCost">0 ₺</p>
+                </div>
+                <div class="pdf-stat-box">
+                    <h3>Ortalama Tüketim</h3>
+                    <p id="pdfAvgCons">0 L / 100KM</p>
+                </div>
+            </div>
+            <table class="pdf-table">
+                <thead>
+                    <tr><th>Tarih</th><th>İstasyon</th><th>KM</th><th>Litre</th><th>Birim F.</th><th>Tutar</th></tr>
+                </thead>
+                <tbody id="pdfTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="pdfResultModal">
+        <div class="pdf-result-box">
+            <h3 style="color: var(--text-main); margin-bottom: 15px;">PDF Raporunuz Hazır!</h3>
+            <a id="pdfResultLink" class="btn" style="text-decoration: none; display: flex; justify-content: center; margin-bottom: 10px;"><i class="fas fa-download"></i> Cihaza İndir</a>
+            <button class="btn btn-outline" onclick="document.getElementById('pdfResultModal').style.display='none'"><i class="fas fa-times"></i> Kapat</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="sekmeDegistir('dashboard', this)"><i class="fas fa-home"></i><span>Ana Sayfa</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('add', this)"><i class="fas fa-plus-circle"></i><span>Yakıt Ekle</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('history', this)"><i class="fas fa-list"></i><span>Geçmiş</span></div>
+        <div class="nav-item" id="navProfile" onclick="sekmeDegistir('profile', this)"><i class="fas fa-user-cog"></i><span>Ayarlar</span></div>
+    </div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYJdXZLattRESMO-Udag_NV8KPtSexUiQ",
+      authDomain: "yakittakippro.firebaseapp.com",
+      projectId: "yakittakippro",
+      storageBucket: "yakittakippro.firebasestorage.app",
+      messagingSenderId: "73308208440",
+      appId: "1:73308208440:web:8d8a8bd8612a085eb615cd",
+      measurementId: "G-4MEL63NWM0"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    
+    try { db.enablePersistence(); } catch (err) { console.log("Çevrimdışı mod hata:", err); }
+
+    let activeProfile = localStorage.getItem('app_active_profile') || 'car'; 
+    let yakitVerileri = []; let profilVerileri = {};
+    let yakitGrafigi, aylikGrafigi, istasyonGrafigi, cropper;
+    let varsayilanResim = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJhNSA1IDAgMSAwIDAgMTAgNSA1IDAgMCAwIDAtMTB6bTAgMTJjLTMuMyAwLTkuOSAxLjctOS45IDVWMThoMTkuOFYxOWMwLTMuMy02LjYtNS05LjktNXoiLz48L3N2Zz4=";
+    let globalGuncelOrtalama = 0; let globalSonFiyat = 0;
+
+    function titret(ms) { if ("vibrate" in navigator) { navigator.vibrate(ms); } }
+    function cssDegiskenAl(isim) { return getComputedStyle(document.body).getPropertyValue(isim).trim(); }
+    function sayiyaCevir(deger) { return parseFloat(deger.toString().replace(',', '.')); }
+    function kacis(html) { return document.createElement('div').appendChild(document.createTextNode(html)).parentNode.innerHTML; }
+
+    window.addEventListener('online', () => { if(auth.currentUser) bulutVeriSenkronizeEt(auth.currentUser.uid); });
+    window.addEventListener('offline', () => {
+        const statusElem = document.getElementById('syncStatus');
+        if(statusElem) { statusElem.style.color = "#f1c40f"; statusElem.innerHTML = '<i class="fas fa-wifi-slash"></i> Çevrimdışı Kayıt'; }
+    });
+
+    function firebaseGirisYap() { titret(20); const provider = new firebase.auth.GoogleAuthProvider(); auth.signInWithPopup(provider).catch(e => alert("Hata: " + e.message)); }
+    function firebaseCikisYap() { titret(15); auth.signOut().then(() => location.reload()); }
+
+    auth.onAuthStateChanged(user => {
+        const loggedInUI = document.getElementById('loggedInUI');
+        const loggedOutUI = document.getElementById('loggedOutUI');
+        if (user) {
+            loggedInUI.style.display = 'block'; loggedOutUI.style.display = 'none';
+            document.getElementById('userName').innerText = user.displayName;
+            document.getElementById('userPhoto').src = user.photoURL;
+            bulutVeriSenkronizeEt(user.uid);
+        } else {
+            loggedInUI.style.display = 'none'; loggedOutUI.style.display = 'block';
+        }
+    });
+
+    async function bulutVeriSenkronizeEt(uid) {
+        const statusElem = document.getElementById('syncStatus');
+        if (!navigator.onLine) return;
+        statusElem.className = "sync-text sync-loading"; statusElem.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Eşitleniyor...';
+        try {
+            const docRef = db.collection("users").doc(uid);
+            const doc = await docRef.get();
+            if (doc.exists && yakitVerileri.length === 0) {
+                const cloudData = doc.data();
+                if(cloudData.app_data_car) {
+                   localStorage.setItem('app_data_car', JSON.stringify(cloudData.app_data_car));
+                   localStorage.setItem('app_data_moto', JSON.stringify(cloudData.app_data_moto));
+                   localStorage.setItem('app_profile_car', JSON.stringify(cloudData.app_profile_car));
+                   localStorage.setItem('app_profile_moto', JSON.stringify(cloudData.app_profile_moto));
+                   loadProfileData(); ekraniGuncelle();
+                }
+            }
+            await docRef.set({
+                app_data_car: JSON.parse(localStorage.getItem('app_data_car')) || [],
+                app_data_moto: JSON.parse(localStorage.getItem('app_data_moto')) || [],
+                app_profile_car: JSON.parse(localStorage.getItem('app_profile_car')),
+                app_profile_moto: JSON.parse(localStorage.getItem('app_profile_moto')),
+                lastSync: new Date().toISOString()
+            }, { merge: true });
+            statusElem.className = "sync-text sync-success"; statusElem.innerHTML = 'Bulut Eşitlendi ✓';
+        } catch (e) { statusElem.innerHTML = 'Hata!'; }
+    }
+
+    function loadProfileData() {
+        yakitVerileri = JSON.parse(localStorage.getItem('app_data_' + activeProfile)) || [];
+        let defaultProfile = { ad: 'Sürücü', plaka: '', yakitTipi: 'Benzin', bakimKM: '', muayene: '', resim: '', onLastik:'', arkaLastik:'', aracTuru: 'Otomobil', depoHacmi: 50 };
+        profilVerileri = JSON.parse(localStorage.getItem('app_profile_' + activeProfile)) || defaultProfile;
+        let vBadge = document.getElementById('vehicleBadge');
+        if(activeProfile === 'car') { vBadge.innerHTML = '<i class="fas fa-car"></i>'; profilVerileri.aracTuru = 'Otomobil'; } 
+        else { vBadge.innerHTML = '<i class="fas fa-motorcycle"></i>'; profilVerileri.aracTuru = 'Motosiklet'; }
+    }
+
+    function saveProfileData() {
+        localStorage.setItem('app_data_' + activeProfile, JSON.stringify(yakitVerileri));
+        localStorage.setItem('app_profile_' + activeProfile, JSON.stringify(profilVerileri));
+        if (auth.currentUser) bulutVeriSenkronizeEt(auth.currentUser.uid);
+    }
+
+    function switchVehicleProfile() {
+        titret([20, 50, 20]);
+        activeProfile = activeProfile === 'car' ? 'moto' : 'car';
+        localStorage.setItem('app_active_profile', activeProfile);
+        loadProfileData(); profilYukle(); ekraniGuncelle(); profilUyariKontrol();
+        alert(activeProfile === 'car' ? "🚗 Otomobil Modu" : "🏍️ Motosiklet Modu");
+    }
+
+    function ekraniGuncelle() {
+        let tablo = document.getElementById('tabloGövdesi'); tablo.innerHTML = "";
+        let etiketler = []; let tuketimDegerleri = []; 
+        let toplamTutar = 0; let toplamLitre = 0;
+
+        globalGuncelOrtalama = 0; globalSonFiyat = 0;
+        document.getElementById('dashAvg').innerText = "- L";
+        document.getElementById('dashRange').innerText = "- KM";
+        document.getElementById('dashCostPerKm').innerText = "- ₺";
+        document.getElementById('dashTotalCost').innerText = "0 ₺";
+        document.getElementById('dashCO2').innerText = "0 KG";
+        const scoreBadge = document.getElementById('scoreBadge');
+        const scoreText = document.getElementById('scoreText');
+        scoreBadge.innerText = "-"; 
+        scoreBadge.style.color = "var(--text-muted)"; 
+        scoreText.innerText="En az 2 kayıt";
+
+        yakitVerileri.slice().reverse().forEach((v) => {
+            let birimFiyat = (parseFloat(v.tutar) / (parseFloat(v.litre) || 1)).toFixed(2);
+            let rowClass = v.isFull ? "" : "partial-row";
+            tablo.innerHTML += `<tr class="${rowClass}"><td>${kacis(v.tarih)}</td><td>${kacis(v.istasyon)}</td><td>${kacis(v.km.toString())}</td><td>${birimFiyat}₺</td><td>${kacis(v.tutar.toString())}₺</td><td>${kacis(v.tuketim)}</td><td><button onclick="kayitSil(${v.id})" class="del-btn"><i class="fas fa-trash"></i></button></td></tr>`;
+        });
+
+        // Grafik ve Dashboard için geçerli tüketim verilerini topla
+        yakitVerileri.forEach((v) => {
+            toplamTutar += parseFloat(v.tutar);
+            if(v.tuketim !== "-" && v.tuketim !== "Hata") {
+                etiketler.push(v.km);
+                tuketimDegerleri.push(parseFloat(v.tuketim));
+                globalGuncelOrtalama = parseFloat(v.tuketim); // En güncel geçerli ortalamayı al
+            }
+        });
+
+        // Toplam CO2 ve Harcama
+        let filtrelenmisLitreler = yakitVerileri.reduce((acc, curr) => acc + parseFloat(curr.litre), 0);
+        document.getElementById('dashTotalCost').innerText = toplamTutar.toFixed(0) + " ₺";
+        document.getElementById('dashCO2').innerText = (filtrelenmisLitreler * 2.31).toFixed(1) + " KG";
+
+        if (globalGuncelOrtalama > 0) {
+            globalSonFiyat = yakitVerileri[yakitVerileri.length-1].fiyat;
+            document.getElementById('dashAvg').innerText = globalGuncelOrtalama.toFixed(2) + " L";
+            let menzil = ((profilVerileri.depoHacmi || 50) / globalGuncelOrtalama) * 100;
+            document.getElementById('dashRange').innerText = Math.round(menzil) + " KM";
+            document.getElementById('dashCostPerKm').innerText = ((globalGuncelOrtalama / 100) * globalSonFiyat).toFixed(2) + " ₺";
+            
+            if(globalGuncelOrtalama < 6) { scoreBadge.innerText = "A+"; scoreBadge.style.color = "#2ecc71"; scoreText.innerText="EKONOMİK"; }
+            else if(globalGuncelOrtalama < 8) { scoreBadge.innerText = "B"; scoreBadge.style.color = "#f1c40f"; scoreText.innerText="STANDART"; }
+            else { scoreBadge.innerText = "C"; scoreBadge.style.color = "#e63946"; scoreText.innerText="AGRESİF"; }
+        }
+
+        grafikCiz(etiketler, tuketimDegerleri);
+        istasyonGrafigiCiz();
+        aylikGrafikCiz();
+    }
+
+    function grafikCiz(etiketler, veriler) {
+        let ctx = document.getElementById('yakitGrafigi').getContext('2d'); if(yakitGrafigi) yakitGrafigi.destroy();
+        yakitGrafigi = new Chart(ctx, { 
+            type: 'line', 
+            data: { labels: etiketler, datasets: [{ data: veriler, borderColor: cssDegiskenAl('--primary'), backgroundColor: 'rgba(0,44,95,0.1)', tension: 0.4, fill: true }] }, 
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false } } } 
+        });
+    }
+
+    function istasyonGrafigiCiz() {
+        let ctx = document.getElementById('istasyonGrafigi').getContext('2d'); if (istasyonGrafigi) istasyonGrafigi.destroy();
+        const stats = {}; yakitVerileri.forEach(v => { stats[v.istasyon] = (stats[v.istasyon] || 0) + 1; });
+        istasyonGrafigi = new Chart(ctx, {
+            type: 'doughnut',
+            data: { labels: Object.keys(stats), datasets: [{ data: Object.values(stats), backgroundColor: ['#002c5f', '#e63946', '#2ecc71', '#f1c40f', '#9b59b6'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: cssDegiskenAl('--text-main'), boxWidth: 10, font: { size: 10 } } } } }
+        });
+    }
+
+    function aylikGrafikCiz() {
+        let ctx = document.getElementById('aylikGrafik').getContext('2d'); if (aylikGrafigi) aylikGrafigi.destroy();
+        const aylikVeri = {}; yakitVerileri.forEach(v => { const ay = v.tarih.substring(0, 7); aylikVeri[ay] = (aylikVeri[ay] || 0) + parseFloat(v.tutar); });
+        const labels = Object.keys(aylikVeri).sort();
+        aylikGrafigi = new Chart(ctx, {
+            type: 'bar',
+            data: { labels
