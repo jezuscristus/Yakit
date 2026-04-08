@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakıt Takip Asistanı Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); transition: all 0.5s ease; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        .main-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 100px; width: 100%; }
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Splash & UI Core */
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: 0.8s; }
+        .rpm-container-vip { position: relative; width: 300px; height: 300px; }
+        .splash-title-liquid-neon { font-size: 30px; font-weight: 800; text-align: center; color: white; margin-top: 20px; letter-spacing: 5px; opacity: 0; transition: 1s; }
+
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card-title { font-size: 16px; margin-bottom: 15px; color: var(--primary); font-weight: 800; display: flex; align-items: center; gap: 8px; }
+
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); text-align: center; padding: 15px; border-radius: 20px; }
+        .stat-card i { font-size: 22px; color: var(--primary); margin-bottom: 8px; }
+        .stat-card h3 { font-size: 18px; font-weight: 800; }
+
+        /* Form Elements */
+        .input-group { margin-bottom: 12px; }
+        .input-group label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px; color: var(--text-muted); }
+        .input-group input { width: 100%; padding: 12px; border: 1px solid var(--glass-border); border-radius: 12px; background: var(--input-bg); color: var(--text-main); outline: none; }
+        
+        /* Toggle Switch */
+        .full-tank-selector { display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); padding: 12px; border-radius: 15px; border: 1px solid var(--glass-border); cursor: pointer; }
+        .switch { position: relative; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+
+        /* History Table Improvements */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+        .avg-cell { font-weight: 800; color: var(--primary); }
+        .avg-sub { font-size: 8px; color: var(--text-muted); display: block; font-weight: 400; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 75px; background: var(--glass-bg); backdrop-filter: blur(15px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; }
+
+        #tripModal { position: fixed; bottom: -100%; left: 0; width: 100%; background: var(--glass-bg); border-radius: 25px 25px 0 0; padding: 25px; transition: 0.4s; z-index: 2000; box-shadow: 0 -10px 30px rgba(0,0,0,0.2); }
+        #tripModal.open { bottom: 0; }
+    </style>
+</head>
+<body onload="uygulamayiBaslat()">
+
+    <div id="splashScreen">
+        <div class="rpm-container-vip">
+            <svg viewBox="0 0 320 320">
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="#222" stroke-width="8"/>
+                <path id="gaugePath" d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="var(--primary)" stroke-width="12" style="stroke-dasharray: 520; stroke-dashoffset: 520;"/>
+                <circle cx="160" cy="160" r="10" fill="white"/>
+            </svg>
+            <div style="position:absolute; top:180px; width:100%; text-align:center;">
+                <span id="rpmVal" style="color:white; font-size:40px; font-weight:800;">0</span>
+            </div>
+        </div>
+        <h1 id="splashTitle" class="splash-title-liquid-neon">YAKIT TAKİP PRO</h1>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none; opacity:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="font-weight:800; font-size:18px; color:var(--primary); letter-spacing:1px;"><i class="fas fa-gas-pump"></i> ASİSTAN</h2>
+            <div style="background:var(--glass-bg); padding:8px 15px; border-radius:12px; font-size:12px; font-weight:800; border:1px solid var(--glass-border);">
+                <i class="fas fa-car"></i> <span id="activeVehicle">OTOMOBİL</span>
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="dashboard">
+                <div class="stat-card"><i class="fas fa-tint"></i><p style="font-size:10px; font-weight:600; color:var(--text-muted);">ORTALAMA</p><h3 id="dashAvg">- L</h3></div>
+                <div class="stat-card"><i class="fas fa-road"></i><p style="font-size:10px; font-weight:600; color:var(--text-muted);">MENZİL</p><h3 id="dashRange">- KM</h3></div>
+                <div class="stat-card"><i class="fas fa-wallet"></i><p style="font-size:10px; font-weight:600; color:var(--text-muted);">TOPLAM HARCAMA</p><h3 id="dashTotalCost">0 ₺</h3></div>
+                <div class="stat-card"><i class="fas fa-coins"></i><p style="font-size:10px; font-weight:600; color:var(--text-muted);">MALİYET / KM</p><h3 id="dashCostPerKm">- ₺</h3></div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-line"></i> Tüketim Trendi</h2>
+                <div style="height:200px;"><canvas id="yakitGrafigi"></canvas></div>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-plus-circle"></i> Yakıt Alımı Ekle</h2>
+                <div class="input-group"><label>Güncel Kilometre</label><input type="number" id="km" placeholder="Örn: 45200"></div>
+                <div class="input-group"><label>Alınan Litre</label><input type="number" id="litre" step="0.01" placeholder="Örn: 35.5"></div>
+                <div class="input-group"><label>Litre Fiyatı (₺)</label><input type="number" id="fiyat" step="0.01" placeholder="Örn: 43.20"></div>
+                
+                <div class="full-tank-selector" onclick="document.getElementById('isFull').click()">
+                    <span style="font-size:13px; font-weight:600;"><i class="fas fa-fill-drip"></i> Depoyu Fulledim</span>
+                    <label class="switch">
+                        <input type="checkbox" id="isFull" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button class="btn" onclick="veriEkle()"><i class="fas fa-save"></i> KAYDET VE ANALİZ ET</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-history"></i> Kayıt Geçmişi</h2>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>KM</th>
+                                <th>Litre</th>
+                                <th>Tutar</th>
+                                <th>Ortalama</th>
+                                <th>Durum</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabloGövdesi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="sekmeDegistir('dashboard', this)"><i class="fas fa-th-large"></i><span>Dashboard</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('add', this)"><i class="fas fa-gas-pump"></i><span>Ekle</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('history', this)"><i class="fas fa-list-ul"></i><span>Geçmiş</span></div>
+    </div>
+
+<script>
+    const firebaseConfig = { apiKey: "AIzaSyAYJdXZLattRESMO-Udag_NV8KPtSexUiQ", authDomain: "yakittakippro.firebaseapp.com", projectId: "yakittakippro" };
+    firebase.initializeApp(firebaseConfig);
+
+    let yakitVerileri = [];
+    let activeProfile = localStorage.getItem('app_active_profile') || 'car';
+    let yakitGrafigi;
+
+    function titret(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+    function loadData() {
+        yakitVerileri = JSON.parse(localStorage.getItem('app_data_' + activeProfile)) || [];
+        ekraniGuncelle();
+    }
+
+    function saveData() {
+        localStorage.setItem('app_data_' + activeProfile, JSON.stringify(yakitVerileri));
+    }
+
+    function veriEkle() {
+        let k = parseInt(document.getElementById('km').value);
+        let l = parseFloat(document.getElementById('litre').value);
+        let f = parseFloat(document.getElementById('fiyat').value);
+        let isFull = document.getElementById('isFull').checked;
+        
+        if(!k || !l || !f) return alert("Eksik bilgi!");
+        if(yakitVerileri.length > 0 && k <= yakitVerileri[yakitVerileri.length-1].km) return alert("KM hatası!");
+
+        let tutar = (l * f).toFixed(2);
+        let tuketim = "-";
+        let segment = "";
+
+        // Kümülatif Hesaplama Algoritması
+        if (isFull && yakitVerileri.length > 0) {
+            let lastFullIndex = -1;
+            for (let i = yakitVerileri.length - 1; i >= 0; i--) {
+                if (yakitVerileri[i].isFull) {
+                    lastFullIndex = i;
+                    break;
+                }
+            }
+
+            if (lastFullIndex !== -1) {
+                let totalLitre = l;
+                for (let j = lastFullIndex + 1; j < yakitVerileri.length; j++) {
+                    totalLitre += parseFloat(yakitVerileri[j].litre);
+                }
+                let yol = k - yakitVerileri[lastFullIndex].km;
+                tuketim = ((totalLitre / yol) * 100).toFixed(2);
+                segment = `${yakitVerileri[lastFullIndex].km} - ${k} KM arası`;
+            }
+        }
+
+        yakitVerileri.push({
+            id: Date.now(),
+            tarih: new Date().toLocaleDateString('tr-TR', {day:'2-digit', month:'2-digit'}),
+            km: k,
+            litre: l,
+            tutar: tutar,
+            tuketim: tuketim,
+            segment: segment,
+            isFull: isFull
+        });
+
+        saveData();
+        ekraniGuncelle();
+        titret(30);
+        
+        document.getElementById('km').value = '';
+        document.getElementById('litre').value = '';
+        document.getElementById('fiyat').value = '';
+        sekmeDegistir('dashboard', document.querySelectorAll('.nav-item')[0]);
+    }
+
+    function ekraniGuncelle() {
+        let tablo = document.getElementById('tabloGövdesi'); tablo.innerHTML = "";
+        let labels = []; let values = [];
+        let toplamTutar = 0;
+
+        yakitVerileri.slice().reverse().forEach(v => {
+            toplamTutar += parseFloat(v.tutar);
+            tablo.innerHTML += `
+                <tr>
+                    <td>${v.tarih}</td>
+                    <td>${v.km}</td>
+                    <td>${v.litre}L</td>
+                    <td>${v.tutar}₺</td>
+                    <td class="avg-cell">
+                        ${v.tuketim !== '-' ? v.tuketim + ' L' : '-'}
+                        <span class="avg-sub">${v.segment}</span>
+                    </td>
+                    <td>${v.isFull ? '<i class="fas fa-gas-pump" style="color:var(--primary)"></i> FULL' : '<i class="fas fa-adjust" style="color:orange"></i> EK'}</td>
+                    <td><button onclick="kayitSil(${v.id})" style="border:none; background:none; color:red; opacity:0.5;"><i class="fas fa-trash"></i></button></td>
+                </tr>`;
+        });
+
+        // Dashboard Verimlilik Hesaplama
+        let firstFull = yakitVerileri.find(v => v.isFull);
+        let lastFull = [...yakitVerileri].reverse().find(v => v.isFull);
+        
+        if (firstFull && lastFull && firstFull !== lastFull) {
+            let totalLAfterFirst = 0;
+            let startIndex = yakitVerileri.indexOf(firstFull);
+            for(let i = startIndex + 1; i < yakitVerileri.length; i++) {
+                totalLAfterFirst += parseFloat(yakitVerileri[i].litre);
+            }
+            let totalDist = lastFull.km - firstFull.km;
+            let genAvg = (totalLAfterFirst / totalDist) * 100;
+            document.getElementById('dashAvg').innerText = genAvg.toFixed(2) + " L";
+            
+            let sonBirimFiyat = yakitVerileri[yakitVerileri.length-1].tutar / yakitVerileri[yakitVerileri.length-1].litre;
+            document.getElementById('dashCostPerKm').innerText = ((genAvg / 100) * sonBirimFiyat).toFixed(2) + " ₺";
+            document.getElementById('dashRange').innerText = Math.round((50 / genAvg) * 100) + " KM";
+        }
+
+        document.getElementById('dashTotalCost').innerText = toplamTutar.toFixed(0) + " ₺";
+        
+        yakitVerileri.filter(v => v.tuketim !== "-").forEach(v => {
+            labels.push(v.km);
+            values.push(parseFloat(v.tuketim));
+        });
+        grafikCiz(labels, values);
+    }
+
+    function grafikCiz(l, v) {
+        let ctx = document.getElementById('yakitGrafigi').getContext('2d');
+        if(yakitGrafigi) yakitGrafigi.destroy();
+        yakitGrafigi = new Chart(ctx, {
+            type: 'line',
+            data: { labels: l, datasets: [{ data: v, borderColor: '#002c5f', tension: 0.4, fill: true, backgroundColor: 'rgba(0,44,95,0.05)', borderWidth: 3, pointRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false }, x: { display: false } } }
+        });
+    }
+
+    function sekmeDegistir(s, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + s).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        titret(10);
+    }
+
+    function kayitSil(id) {
+        if(confirm("Kaydı sil?")) {
+            yakitVerileri = yakitVerileri.filter(v => v.id !== id);
+            saveData();
+            ekraniGuncelle();
+        }
+    }
+
+    function uygulamayiBaslat() {
+        let path = document.getElementById('gaugePath');
+        let val = document.getElementById('rpmVal');
+        let start = null;
+        
+        function animate(ts) {
+            if(!start) start = ts;
+            let progress = ts - start;
+            let cur = Math.min((progress/1200) * 8000, 8000);
+            path.style.strokeDashoffset = 520 - (cur/8000) * 520;
+            val.innerText = Math.floor(cur);
+            if(progress < 1200) requestAnimationFrame(animate);
+            else {
+                document.getElementById('splashTitle').style.opacity = '1';
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splashScreen').style.display = 'none';
+                        document.getElementById('mainApp').style.display = 'block';
+                        setTimeout(() => { document.getElementById('mainApp').style.opacity = '1'; loadData(); }, 50);
+                    }, 600);
+                }, 1000);
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+</script>
+</body>
+</html>
