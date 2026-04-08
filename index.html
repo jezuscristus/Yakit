@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Yakıt Takip Asistanı Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #002c5f; --accent: #e63946;
+            --bg-grad: linear-gradient(135deg, #e2e2e2 0%, #9bc5c3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75); --glass-border: rgba(255, 255, 255, 0.5);
+            --text-main: #222222; --text-muted: #555555; --input-bg: rgba(255, 255, 255, 0.9);
+            --tilt-x: 0deg; --tilt-y: 0deg;
+        }
+        body.theme-gece {
+            --primary: #4facfe; --accent: #ff4757;
+            --bg-grad: linear-gradient(135deg, #141e30 0%, #243b55 100%);
+            --glass-bg: rgba(20, 20, 20, 0.7); --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff; --text-muted: #cccccc; --input-bg: rgba(0, 0, 0, 0.6);
+        }
+        body.theme-nline { --primary: #e63946; --accent: #ffffff; --bg-grad: linear-gradient(135deg, #121212 0%, #2b2b2b 100%); --glass-bg: rgba(30, 30, 30, 0.8); --glass-border: rgba(230, 57, 70, 0.3); --text-main: #f1f1f1; --text-muted: #aaaaaa; --input-bg: rgba(15, 15, 15, 0.9); }
+        body.theme-elite { --primary: #b0bec5; --accent: #ffffff; --bg-grad: linear-gradient(135deg, #263238 0%, #101418 100%); --glass-bg: rgba(40, 50, 56, 0.7); --glass-border: rgba(176, 190, 197, 0.2); --text-main: #eceff1; --text-muted: #90a4ae; --input-bg: rgba(20, 26, 30, 0.8); }
+        body.theme-eco { --primary: #2ecc71; --accent: #f1c40f; --bg-grad: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%); --glass-bg: rgba(20, 35, 30, 0.7); --glass-border: rgba(46, 204, 113, 0.2); --text-main: #ffffff; --text-muted: #a3c2b1; --input-bg: rgba(10, 20, 15, 0.8); }
+
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        html { background: var(--bg-grad); height: 100%; overflow: hidden; }
+        body { background: var(--bg-grad); background-attachment: fixed; color: var(--text-main); transition: all 0.5s ease; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; perspective: 1000px; }
+        
+        #splashScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #050505; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: all 0.8s ease-in-out; }
+        .rpm-container-vip { position: relative; width: 320px; height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; margin-top: -60px; transition: opacity 0.4s ease, transform 0.4s ease; }
+        .rpm-gauge-vip { width: 100%; height: 100%; position: absolute; top: 0; left: 0; overflow: visible; }
+        .gauge-bar-vip { stroke-width: 12; stroke-linecap: round; stroke-dasharray: 520; stroke-dashoffset: 520; animation: revUpVIP 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        #needle { transform-origin: 160px 160px; transform: rotate(-135deg); transition: transform 0.05s linear; }
+        .rpm-text-vip { position: absolute; top: 190px; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+        #rpmValueVip { font-size: 55px; font-weight: 800; color: #fff; text-shadow: 0 0 15px rgba(255,255,255,0.4); line-height: 1; }
+        .rpm-text-vip small { font-size: 14px; color: #e74c3c; font-weight: 800; letter-spacing: 4px; margin-top: 5px; }
+
+        @keyframes revUpVIP { 0% { stroke-dashoffset: 520; filter: drop-shadow(0 0 10px rgba(46,204,113,0.8)); } 100% { stroke-dashoffset: 0; filter: drop-shadow(0 0 15px rgba(231,76,60,0.9)); } }
+
+        .splash-title-container-vip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; width: 100%; z-index: 2; pointer-events: none; }
+        .splash-title-liquid-neon { font-size: 34px; font-weight: 800; letter-spacing: 5px; margin: 0; opacity: 0; text-align: center; line-height: 1.4; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.15); background: linear-gradient(90deg, var(--primary), var(--accent), #ffffff, var(--primary)); background-size: 300% 100%; -webkit-background-clip: text; filter: drop-shadow(0 0 15px var(--primary)); transform: scale(0.9); }
+        .neon-slide { opacity: 1; transform: scale(1); transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1); animation: liquidFlow 3s linear infinite; }
+        @keyframes liquidFlow { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+        .main-content { display: block; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 15px; padding-bottom: calc(95px + env(safe-area-inset-bottom)); width: 100%; }
+        .tab-content { display: none; width: 100%; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: calc(75px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--glass-bg); backdrop-filter: blur(15px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; transition: 0.3s; width: 25%; }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; transition: 0.3s; }
+        .nav-item.active { color: var(--primary); }
+
+        .card { background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; width: 100%;}
+        .card-title { font-size: 16px; margin-bottom: 15px; color: var(--primary); font-weight: 800; display: flex; align-items: center; gap: 8px;}
+
+        .dashboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); text-align: center; padding: 15px; border-radius: 20px; }
+        .stat-card h3 { font-size: 18px; font-weight: 800; margin-top: 5px;}
+
+        .input-group { margin-bottom: 12px; }
+        .input-group label { font-size: 12px; margin-bottom: 5px; color: var(--text-muted); font-weight: 600; display: block; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid var(--glass-border); border-radius: 12px; background: var(--input-bg); color: var(--text-main); outline: none;}
+        
+        /* HESAPLAMA DÜZELTME SWITCH */
+        .switch-group { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.05); padding: 12px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--glass-border); }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2ecc71; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; transition: 0.2s; }
+        .btn:active { transform: scale(0.97); }
+
+        .visual-garage { position: relative; width: 100%; height: 280px; background: rgba(0,0,0,0.05); border-radius: 20px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .car-top-view { position: relative; width: 100px; height: 220px; background: linear-gradient(to bottom, var(--primary) 0%, #1a1a1a 100%); border-radius: 30px; }
+        .tire { position: absolute; width: 20px; height: 45px; background: #222; border-radius: 5px; z-index: 1;}
+        .tire-fl { top: 25px; left: -10px; } .tire-fr { top: 25px; right: -10px; }
+        .tire-rl { bottom: 25px; left: -10px; } .tire-rr { bottom: 25px; right: -10px; }
+        .psi-badge { position: absolute; background: var(--glass-bg); padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1px solid var(--glass-border); z-index: 2;}
+        .psi-fl { top: 20px; left: -60px; } .psi-fr { top: 20px; right: -60px; }
+        .psi-rl { bottom: 20px; left: -60px; } .psi-rr { bottom: 20px; right: -60px; }
+
+        #ocrOverlay, #voiceOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: center; border-radius: 20px; }
+        .partial-row { opacity: 0.6; background: rgba(0,0,0,0.02); }
+    </style>
+</head>
+<body onload="uygulamayiBaslat()">
+
+    <div id="splashScreen">
+        <div class="rpm-container-vip">
+            <svg class="rpm-gauge-vip" viewBox="0 0 320 320">
+                <defs>
+                    <linearGradient id="multiColorGradient" x1="0%" y1="100%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#2ecc71" /><stop offset="50%" stop-color="#4facfe" /><stop offset="100%" stop-color="#e74c3c" />
+                    </linearGradient>
+                </defs>
+                <path d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="#111" stroke-width="6" stroke-linecap="round"/>
+                <path class="gauge-bar-vip" d="M 60 260 A 120 120 0 1 1 260 260" fill="none" stroke="url(#multiColorGradient)" stroke-width="12" stroke-linecap="round"/>
+                <g id="needle">
+                    <polygon points="157,160 163,160 160,55" fill="#fff" filter="drop-shadow(0 0 5px rgba(255,255,255,0.5))"/>
+                    <circle cx="160" cy="160" r="16" fill="#050505" stroke="#333" stroke-width="4"/>
+                </g>
+            </svg>
+            <div class="rpm-text-vip"><span id="rpmValueVip">0</span> <small>RPM</small></div>
+        </div>
+        <div class="splash-title-container-vip">
+            <h1 class="splash-title-liquid-neon">YAKIT TAKİP<br>ASİSTANI</h1>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainApp" style="display:none; opacity:0; transition: 0.8s ease;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <p id="tarihGosterge" style="font-size: 13px; color: var(--text-muted); font-weight: 600;">İyi Sürüşler,</p>
+                <h1 id="kullaniciGosterge" style="font-size: 20px; font-weight: 800;">Sürücü <span id="plakaGosterge" style="font-size: 10px; background: var(--primary); color: #fff; padding: 2px 6px; border-radius: 4px; display:none;"></span></h1>
+            </div>
+            <div style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--primary); overflow: hidden;">
+                <img id="headerProfilePic" src="" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+        </div>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="dashboard">
+                <div class="stat-card"><i class="fas fa-tint" style="color:var(--primary)"></i><small>Ortalama</small><h3 id="dashAvg">- L</h3></div>
+                <div class="stat-card"><i class="fas fa-road" style="color:var(--primary)"></i><small>Menzil</small><h3 id="dashRange">- KM</h3></div>
+                <div class="stat-card"><i class="fas fa-wallet" style="color:var(--primary)"></i><small>Harcama</small><h3 id="dashTotalCost">0 ₺</h3></div>
+                <div class="stat-card"><i class="fas fa-coins" style="color:var(--primary)"></i><small>TL / KM</small><h3 id="dashCostPerKm">- ₺</h3></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-chart-line"></i> Tüketim Trendi</h2>
+                <div style="height: 180px;"><canvas id="yakitGrafigi"></canvas></div>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button class="btn" style="background:linear-gradient(135deg, var(--primary), var(--accent)); font-size:12px;" onclick="document.getElementById('ocrInput').click()"><i class="fas fa-camera"></i> AI Tara</button>
+                <input type="file" id="ocrInput" accept="image/*" style="display:none" onchange="fisTaraAI(event)">
+                <button class="btn" style="background:var(--primary); font-size:12px;" onclick="sesliAsistanBaslat()"><i class="fas fa-microphone"></i> Sesle Ekle</button>
+            </div>
+
+            <div class="card" style="position:relative;">
+                <div id="ocrOverlay"><p style="color:#fff; font-weight:800;">Analiz Ediliyor...</p></div>
+                <div id="voiceOverlay"><p style="color:#fff; font-weight:800;">Dinleniyor...</p></div>
+                
+                <h2 class="card-title"><i class="fas fa-gas-pump"></i> Yakıt Bilgileri</h2>
+                <div class="input-group"><label>Tarih</label><input type="date" id="tarih"></div>
+                <div class="input-group">
+                    <label>İstasyon</label>
+                    <select id="istasyon">
+                        <option value="Shell">Shell</option><option value="Opet">Opet</option><option value="BP">BP</option><option value="Petrol Ofisi">Petrol Ofisi</option><option value="Diğer">Diğer</option>
+                    </select>
+                </div>
+                <div class="input-group"><label>Güncel KM</label><input type="number" id="km" placeholder="Örn: 46350"></div>
+                <div class="input-group"><label>Alınan Litre</label><input type="number" step="0.01" id="litre" placeholder="Örn: 35.00"></div>
+                <div class="input-group"><label>Birim Fiyat (₺)</label><input type="number" step="0.01" id="fiyat" placeholder="Örn: 33.00"></div>
+                
+                <div class="switch-group">
+                    <span style="font-size: 13px; font-weight: 800;">Depoyu Fulledim</span>
+                    <label class="switch"><input type="checkbox" id="depoFull" checked><span class="slider"></span></label>
+                </div>
+
+                <button class="btn" onclick="veriEkle()"><i class="fas fa-save"></i> KAYDET</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title" style="justify-content:space-between;">
+                    <span><i class="fas fa-history"></i> Kayıtlar</span>
+                    <button onclick="generatePDF()" style="background:none; border:none; color:var(--primary); font-weight:800; font-size:11px;"><i class="fas fa-file-pdf"></i> PDF</button>
+                </h2>
+                <div style="overflow-x: auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                        <thead><tr style="text-align:left; color:var(--primary);"><th>Tarih</th><th>KM</th><th>Litre</th><th>Dolu</th><th>Ort.</th><th>Sil</th></tr></thead>
+                        <tbody id="tabloGövdesi"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-profile" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-car"></i> Garaj & Ayarlar</h2>
+                <div class="visual-garage">
+                    <div class="car-top-view">
+                        <div class="tire tire-fl"></div><div class="psi-badge psi-fl"><span id="vg-fl">32</span> PSI</div>
+                        <div class="tire tire-fr"></div><div class="psi-badge psi-fr"><span id="vg-fr">32</span> PSI</div>
+                        <div class="tire tire-rl"></div><div class="psi-badge psi-rl"><span id="vg-rl">30</span> PSI</div>
+                        <div class="tire tire-rr"></div><div class="psi-badge psi-rr"><span id="vg-rr">30</span> PSI</div>
+                    </div>
+                </div>
+                <div class="input-group" style="margin-top:15px;"><label>Ad Soyad</label><input type="text" id="adSoyad"></div>
+                <div class="input-group"><label>Plaka</label><input type="text" id="plakaNo"></div>
+                <div class="input-group"><label>Depo Hacmi (L)</label><input type="number" id="depoHacmi"></div>
+                <div style="display:flex; gap:10px;">
+                    <div class="input-group" style="flex:1;"><label>Ön PSI</label><input type="number" id="onLastik"></div>
+                    <div class="input-group" style="flex:1;"><label>Arka PSI</label><input type="number" id="arkaLastik"></div>
+                </div>
+                <button class="btn" onclick="profilKaydet()">KAYDET</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="sekmeDegistir('dashboard', this)"><i class="fas fa-home"></i><span>Ana Sayfa</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('add', this)"><i class="fas fa-plus-circle"></i><span>Ekle</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('history', this)"><i class="fas fa-history"></i><span>Geçmiş</span></div>
+        <div class="nav-item" onclick="sekmeDegistir('profile', this)"><i class="fas fa-user-cog"></i><span>Profil</span></div>
+    </div>
+
+<script>
+    // --- APP DATA & INITIALIZATION ---
+    let yakitVerileri = JSON.parse(localStorage.getItem('app_data_car')) || [];
+    let profilVerileri = JSON.parse(localStorage.getItem('app_profile_car')) || { ad: 'Sürücü', plaka: '', depoHacmi: 50, onLastik: 32, arkaLastik: 30 };
+    let yakitGrafigi;
+
+    function titret(ms) { if ("vibrate" in navigator) navigator.vibrate(ms); }
+
+    function uygulamayiBaslat() {
+        // RPM Animation Logic
+        let rpmVal = document.getElementById("rpmValueVip");
+        let needle = document.getElementById("needle");
+        let start = null;
+        function rpmStep(ts) {
+            if (!start) start = ts;
+            let progress = ts - start;
+            let cur = Math.min((progress / 2000) * 8000, 8000);
+            needle.style.transform = `rotate(${-135 + (cur / 8000) * 270}deg)`;
+            rpmVal.innerText = Math.floor(cur);
+            if (progress < 2000) requestAnimationFrame(rpmStep);
+            else {
+                document.querySelector('.rpm-container-vip').style.opacity = '0';
+                setTimeout(() => { document.querySelector('.splash-title-liquid-neon').classList.add('neon-slide'); }, 200);
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splashScreen').style.display = 'none';
+                        document.getElementById('mainApp').style.display = 'block';
+                        setTimeout(() => { document.getElementById('mainApp').style.opacity = '1'; ekraniGuncelle(); }, 50);
+                    }, 800);
+                }, 2000);
+            }
+        }
+        requestAnimationFrame(rpmStep);
+        
+        // Initial Data Load
+        document.getElementById('tarih').valueAsDate = new Date();
+        profilYukle();
+    }
+
+    // --- SMART CALCULATION LOGIC (FIXED) ---
+    function veriEkle() {
+        const t = document.getElementById('tarih').value;
+        const k = parseInt(document.getElementById('km').value);
+        const l = parseFloat(document.getElementById('litre').value);
+        const f = parseFloat(document.getElementById('fiyat').value);
+        const isFull = document.getElementById('depoFull').checked;
+
+        if(!t || !k || !l || !f) return alert("Eksik bilgi!");
+        if(yakitVerileri.length > 0 && k <= yakitVerileri[yakitVerileri.length-1].km) return alert("KM hatalı!");
+
+        let hesaplananOrtalama = "-";
+
+        if (isFull) {
+            let toplamLitreHavuzu = l;
+            let baslangicKM = 0;
+            let bulundu = false;
+
+            for (let i = yakitVerileri.length - 1; i >= 0; i--) {
+                if (yakitVerileri[i].isFull) {
+                    baslangicKM = yakitVerileri[i].km;
+                    bulundu = true;
+                    break;
+                } else {
+                    toplamLitreHavuzu += yakitVerileri[i].litre;
+                }
+            }
+
+            if (bulundu) {
+                let mesafe = k - baslangicKM;
+                let sonuc = (toplamLitreHavuzu / mesafe) * 100;
+                hesaplananOrtalama = (sonuc > 25 || sonuc < 3) ? "Veri Hatası" : sonuc.toFixed(2);
+            }
+        }
+
+        yakitVerileri.push({
+            id: Date.now(), tarih: t, km: k, litre: l, fiyat: f,
+            tutar: (l * f).toFixed(2), isFull: isFull, tuketim: hesaplananOrtalama,
+            istasyon: document.getElementById('istasyon').value
+        });
+
+        localStorage.setItem('app_data_car', JSON.stringify(yakitVerileri));
+        ekraniGuncelle();
+        alert("Kayıt Başarılı!");
+        sekmeDegistir('dashboard', document.querySelector('.nav-item'));
+    }
+
+    function ekraniGuncelle() {
+        const body = document.getElementById('tabloGövdesi');
+        body.innerHTML = "";
+        let labels = []; let data = [];
+        let toplamTutar = 0; let sonOrt = "-";
+
+        yakitVerileri.slice().reverse().forEach(v => {
+            const rowClass = v.isFull ? "" : "partial-row";
+            body.innerHTML += `<tr class="${rowClass}">
+                <td>${v.tarih}</td><td>${v.km}</td><td>${v.litre}L</td>
+                <td>${v.isFull ? 'Evet' : 'Hayır'}</td>
+                <td style="font-weight:800; color:var(--primary)">${v.tuketim}</td>
+                <td><i class="fas fa-trash" onclick="kayitSil(${v.id})" style="color:var(--accent); cursor:pointer;"></i></td>
+            </tr>`;
+
+            if(v.tuketim !== "-" && v.tuketim !== "Veri Hatası") {
+                labels.unshift(v.tarih);
+                data.unshift(parseFloat(v.tuketim));
+                sonOrt = v.tuketim;
+            }
+            toplamTutar += parseFloat(v.tutar);
+        });
+
+        document.getElementById('dashAvg').innerText = sonOrt + " L";
+        document.getElementById('dashTotalCost').innerText = Math.round(toplamTutar) + " ₺";
+        
+        if(sonOrt !== "-") {
+            let sonFiyat = yakitVerileri[yakitVerileri.length-1].fiyat;
+            document.getElementById('dashCostPerKm').innerText = ((parseFloat(sonOrt)/100)*sonFiyat).toFixed(2) + " ₺";
+            let menzil = (profilVerileri.depoHacmi / parseFloat(sonOrt)) * 100;
+            document.getElementById('dashRange').innerText = Math.round(menzil) + " KM";
+        }
+
+        grafikCiz(labels, data);
+    }
+
+    // --- OTHER UI LOGICS ---
+    function sekmeDegistir(s, el) {
+        titret(10);
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + s).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function profilYukle() {
+        document.getElementById('adSoyad').value = profilVerileri.ad;
+        document.getElementById('plakaNo').value = profilVerileri.plaka;
+        document.getElementById('depoHacmi').value = profilVerileri.depoHacmi;
+        document.getElementById('onLastik').value = profilVerileri.onLastik;
+        document.getElementById('arkaLastik').value = profilVerileri.arkaLastik;
+        document.getElementById('vg-fl').innerText = profilVerileri.onLastik;
+        document.getElementById('vg-rl').innerText = profilVerileri.arkaLastik;
+        if(profilVerileri.plaka) {
+            document.getElementById('plakaGosterge').innerText = profilVerileri.plaka;
+            document.getElementById('plakaGosterge').style.display = 'inline-block';
+        }
+    }
+
+    function profilKaydet() {
+        profilVerileri = {
+            ad: document.getElementById('adSoyad').value,
+            plaka: document.getElementById('plakaNo').value.toUpperCase(),
+            depoHacmi: document.getElementById('depoHacmi').value,
+            onLastik: document.getElementById('onLastik').value,
+            arkaLastik: document.getElementById('arkaLastik').value
+        };
+        localStorage.setItem('app_profile_car', JSON.stringify(profilVerileri));
+        profilYukle();
+        alert("Profil Güncellendi!");
+    }
+
+    function kayitSil(id) {
+        if(confirm("Silmek istediğinize emin misiniz?")) {
+            yakitVerileri = yakitVerileri.filter(v => v.id !== id);
+            localStorage.setItem('app_data_car', JSON.stringify(yakitVerileri));
+            ekraniGuncelle();
+        }
+    }
+
+    function grafikCiz(l, d) {
+        const ctx = document.getElementById('yakitGrafigi').getContext('2d');
+        if(yakitGrafigi) yakitGrafigi.destroy();
+        yakitGrafigi = new Chart(ctx, {
+            type: 'line',
+            data: { labels: l, datasets: [{ data: d, borderColor: '#002c5f', tension: 0.4, fill: true, backgroundColor: 'rgba(0,44,95,0.1)' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    // --- ADVANCED FEATURES (AI & PDF) ---
+    async function fisTaraAI(e) {
+        document.getElementById('ocrOverlay').style.display = 'flex';
+        // Tesseract integration placeholder
+        setTimeout(() => { document.getElementById('ocrOverlay').style.display = 'none'; alert("OCR Modülü Simüle Edildi."); }, 2000);
+    }
+
+    function sesliAsistanBaslat() {
+        document.getElementById('voiceOverlay').style.display = 'flex';
+        setTimeout(() => { document.getElementById('voiceOverlay').style.display = 'none'; }, 2000);
+    }
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("Yakıt Takip Raporu", 10, 10);
+        yakitVerileri.forEach((v, i) => {
+            doc.text(`${v.tarih} - ${v.km} KM - ${v.tuketim} L/100KM`, 10, 20 + (i * 10));
+        });
+        doc.save("yakit_rapor.pdf");
+    }
+</script>
+</body>
+</html>
